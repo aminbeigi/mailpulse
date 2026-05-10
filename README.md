@@ -25,23 +25,26 @@ uv run python -m mailpulse
 
 The server starts at `http://127.0.0.1:8000` by default.
 
-| Endpoint        | Description       |
-|-----------------|-------------------|
-| `GET /health`   | Health check      |
-| `GET /docs`     | Swagger UI        |
-| `GET /redoc`    | ReDoc UI          |
+
+| Endpoint      | Description  |
+| ------------- | ------------ |
+| `GET /health` | Health check |
+| `GET /docs`   | Swagger UI   |
+
 
 ## Configuration
 
 All settings are read from environment variables (or a `.env` file) with the `MAILPULSE_` prefix:
 
-| Variable              | Default       | Description             |
-|-----------------------|---------------|-------------------------|
-| `MAILPULSE_HOST`      | `127.0.0.1`   | Bind host               |
-| `MAILPULSE_PORT`      | `8000`        | Bind port               |
-| `MAILPULSE_RELOAD`    | `false`       | Enable hot-reload       |
-| `MAILPULSE_APP_NAME`  | `MailPulse`   | Application name        |
-| `MAILPULSE_VERSION`   | `0.1.0`       | Application version     |
+
+| Variable             | Default     | Description         |
+| -------------------- | ----------- | ------------------- |
+| `MAILPULSE_HOST`     | `127.0.0.1` | Bind host           |
+| `MAILPULSE_PORT`     | `8000`      | Bind port           |
+| `MAILPULSE_RELOAD`   | `false`     | Enable hot-reload   |
+| `MAILPULSE_APP_NAME` | `MailPulse` | Application name    |
+| `MAILPULSE_VERSION`  | `0.1.0`     | Application version |
+
 
 ## Lint & Format
 
@@ -82,3 +85,4 @@ mailpulse/
 ├── schemas/           # Pydantic request/response models
 └── services/          # Business logic
 ```
+
