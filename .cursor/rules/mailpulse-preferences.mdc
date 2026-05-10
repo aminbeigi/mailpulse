@@ -1,0 +1,26 @@
+---
+description: Project-wide conventions and workflow for Mailpulse
+alwaysApply: true
+---
+
+# Ruff after edits
+
+After making code changes in this repository, unless the user explicitly says not to, run:
+
+`uv run ruff check --fix mailpulse && uv run ruff format mailpulse`
+
+# Control flow
+
+Avoid one-line if/else forms (including ternary expressions). Use a normal `if` / `else` block so branches stay easy to read and step through.
+
+```python
+# bad — ternary crammed on one line
+timeout = short_timeout if fast_path else long_timeout
+
+# good — explicit branches
+if fast_path:
+    timeout = short_timeout
+else:
+    timeout = long_timeout
+```
+
