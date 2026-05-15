@@ -25,6 +25,29 @@ uv run python -m mailpulse
 
 The server starts at `http://127.0.0.1:8000` by default.
 
+## Tests
+
+Automated tests live in the top-level `tests/` directory (for example `tests/test_health.py`). They use [pytest](https://docs.pytest.org/) together with FastAPI’s test client (via [httpx](https://www.python-httpx.org/)).
+
+Install dev dependencies (including pytest) if you have not already:
+
+```bash
+uv sync --group dev
+```
+
+Run the full suite:
+
+```bash
+uv run pytest
+```
+
+Run a single file or test:
+
+```bash
+uv run pytest tests/test_health.py
+uv run pytest tests/test_health.py::test_health_returns_ok
+```
+
 ## Docker
 
 Build and run the API in a container (the image sets `MAILPULSE_HOST=0.0.0.0` so the server accepts connections from outside the container):
@@ -100,5 +123,7 @@ mailpulse/
 │   └── config.py      # Settings via pydantic-settings
 ├── schemas/           # Pydantic request/response models
 └── services/          # Business logic
+tests/
+└── test_health.py     # Example API test (GET /health)
 ```
 
