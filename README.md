@@ -121,15 +121,15 @@ mailpulse/
 │   ├── router.py      # Aggregates all route modules
 │   └── routes/
 │       ├── health.py  # GET /health
-│       └── email_health.py  # GET /v1/mail-health
+│       └── mail_health.py  # GET /v1/mail-health
 ├── core/
 │   └── config.py      # Settings via pydantic-settings
 ├── schemas/           # Pydantic request/response models
-│   └── email_health.py
+│   └── mail_health.py
 └── services/          # Business logic
-    └── email_health.py
+    └── mail_health.py
 tests/
 ├── test_health.py     # Example API test (GET /health)
-└── test_email_health.py  # GET /v1/mail-health
+└── test_mail_health.py  # GET /v1/mail-health
 ```
 
