@@ -25,6 +25,22 @@ uv run python -m mailpulse
 
 The server starts at `http://127.0.0.1:8000` by default.
 
+## Docker
+
+Build and run the API in a container (the image sets `MAILPULSE_HOST=0.0.0.0` so the server accepts connections from outside the container):
+
+```bash
+docker build -t mailpulse .
+
+docker run --rm -p 8000:8000 mailpulse
+```
+
+Open `http://127.0.0.1:8000/docs` or override settings with `-e`, for example:
+
+```bash
+docker run --rm -p 8080:8080 -e MAILPULSE_PORT=8080 mailpulse
+```
+
 
 | Endpoint      | Description  |
 | ------------- | ------------ |
