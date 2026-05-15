@@ -10,27 +10,27 @@ def client() -> TestClient:
 
 
 def test_mail_health_missing_email(client: TestClient) -> None:
-    response = client.get("/v1/mail-health")
+    response = client.get("/api/v1/mail-health")
     assert response.status_code == 422
 
 
 def test_mail_health_invalid_not_an_email(client: TestClient) -> None:
-    response = client.get("/v1/mail-health", params={"email": "not-an-email"})
+    response = client.get("/api/v1/mail-health", params={"email": "not-an-email"})
     assert response.status_code == 422
 
 
 def test_mail_health_invalid_empty(client: TestClient) -> None:
-    response = client.get("/v1/mail-health", params={"email": ""})
+    response = client.get("/api/v1/mail-health", params={"email": ""})
     assert response.status_code == 422
 
 
 def test_mail_health_invalid_no_domain_dot(client: TestClient) -> None:
-    response = client.get("/v1/mail-health", params={"email": "a@b"})
+    response = client.get("/api/v1/mail-health", params={"email": "a@b"})
     assert response.status_code == 422
 
 
 def test_mail_health_invalid_a_at(client: TestClient) -> None:
-    response = client.get("/v1/mail-health", params={"email": "a@"})
+    response = client.get("/api/v1/mail-health", params={"email": "a@"})
     assert response.status_code == 422
 
 
@@ -41,7 +41,7 @@ def test_mail_health_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr("mailpulse.services.mail_health._resolve_mx", fake_resolve_mx)
     client = TestClient(create_app())
-    response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
+    response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
     assert data == {
@@ -73,7 +73,7 @@ def test_mail_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> Non
         fake_resolve_ip_for_mx_host,
     )
     client = TestClient(create_app())
-    response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
+    response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
     assert data == {
@@ -111,7 +111,7 @@ def test_mail_health_smtp_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
         fake_probe_smtp_socket,
     )
     client = TestClient(create_app())
-    response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
+    response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
     assert data == {
@@ -152,7 +152,7 @@ def test_mail_health_ehlo_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr("mailpulse.services.mail_health._smtp_ehlo_ok", fake_smtp_ehlo_ok)
     client = TestClient(create_app())
-    response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
+    response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
     assert data == {
@@ -193,7 +193,7 @@ def test_mail_health_all_checks_pass(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr("mailpulse.services.mail_health._smtp_ehlo_ok", fake_smtp_ehlo_ok)
     client = TestClient(create_app())
-    response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
+    response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
     assert data == {

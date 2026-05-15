@@ -68,9 +68,9 @@ docker run --rm -p 8000:8000 mailpulse
 
 | Endpoint                 | Description                                      |
 | ------------------------ | ------------------------------------------------ |
-| `GET /health`            | Health check                                     |
-| `GET /v1/mail-health`    | Mail-receiving health for an email’s domain      |
-| `GET /docs`              | Swagger UI                                       |
+| `GET /api/v1/health`       | Health check                                     |
+| `GET /api/v1/mail-health`  | Mail-receiving health for an email’s domain      |
+| `GET /api/v1/docs`         | Swagger UI                                       |
 
 
 ## Configuration
@@ -120,8 +120,8 @@ mailpulse/
 ├── api/
 │   ├── router.py      # Aggregates all route modules
 │   └── routes/
-│       ├── health.py  # GET /health
-│       └── mail_health.py  # GET /v1/mail-health
+│       ├── health.py  # GET /api/v1/health
+│       └── mail_health.py  # GET /api/v1/mail-health
 ├── core/
 │   └── config.py      # Settings via pydantic-settings
 ├── schemas/           # Pydantic request/response models
@@ -129,7 +129,7 @@ mailpulse/
 └── services/          # Business logic
     └── mail_health.py
 tests/
-├── test_health.py     # Example API test (GET /health)
-└── test_mail_health.py  # GET /v1/mail-health
+├── test_health.py     # Example API test (GET /api/v1/health)
+└── test_mail_health.py  # GET /api/v1/mail-health
 ```
 

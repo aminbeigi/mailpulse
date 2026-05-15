@@ -4,7 +4,7 @@ from fastapi.concurrency import run_in_threadpool
 from mailpulse.schemas.mail_health import MailHealthResponse
 from mailpulse.services.mail_health import check_mail_health
 
-router = APIRouter(prefix="/v1", tags=["mail-health"])
+router = APIRouter(tags=["mail-health"])
 
 
 @router.get("/mail-health", response_model=MailHealthResponse)
