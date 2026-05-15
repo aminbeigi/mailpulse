@@ -1,1 +1,1 @@
-"""MailPulse service layer: import concrete modules (for example ``email_health``)."""
+"""MailPulse service layer: import concrete modules (for example ``mail_health``)."""

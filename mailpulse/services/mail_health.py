@@ -6,7 +6,7 @@ import socket
 import dns.exception
 import dns.resolver
 
-from mailpulse.schemas.email_health import EmailHealthChecks, EmailHealthResponse
+from mailpulse.schemas.mail_health import MailHealthChecks, MailHealthResponse
 
 DNS_TIMEOUT_SECONDS = 5
 SMTP_TIMEOUT_SECONDS = 10
@@ -114,7 +114,7 @@ def _smtp_ehlo_ok(address: str) -> bool:
     return 200 <= code < 400
 
 
-def check_email_health(email: str) -> EmailHealthResponse:
+def check_mail_health(email: str) -> MailHealthResponse:
     """Run MX, resolution, reachability, and EHLO checks for the domain in *email*.
 
     Stops at the first failed step; later check flags remain ``False``. Raises
@@ -130,13 +130,13 @@ def check_email_health(email: str) -> EmailHealthResponse:
 
     mx_rows = _resolve_mx(domain)
     if not mx_rows:
-        checks = EmailHealthChecks(
+        checks = MailHealthChecks(
             mx_records_found=mx_records_found,
             mx_resolves=mx_resolves,
             smtp_reachable=smtp_reachable,
             smtp_handshake_ok=smtp_handshake_ok,
         )
-        return EmailHealthResponse(
+        return MailHealthResponse(
             domain=domain,
             healthy=False,
             status="unhealthy",
@@ -149,13 +149,13 @@ def check_email_health(email: str) -> EmailHealthResponse:
     ip_address = _resolve_ip_for_mx_host(mx_host)
     if not ip_address:
         reason = "Highest-priority MX did not resolve"
-        checks = EmailHealthChecks(
+        checks = MailHealthChecks(
             mx_records_found=mx_records_found,
             mx_resolves=mx_resolves,
             smtp_reachable=smtp_reachable,
             smtp_handshake_ok=smtp_handshake_ok,
         )
-        return EmailHealthResponse(
+        return MailHealthResponse(
             domain=domain,
             healthy=False,
             status="unhealthy",
@@ -166,13 +166,13 @@ def check_email_health(email: str) -> EmailHealthResponse:
     mx_resolves = True
     if not _probe_smtp_socket(ip_address):
         reason = "SMTP unreachable on port 25"
-        checks = EmailHealthChecks(
+        checks = MailHealthChecks(
             mx_records_found=mx_records_found,
             mx_resolves=mx_resolves,
             smtp_reachable=smtp_reachable,
             smtp_handshake_ok=smtp_handshake_ok,
         )
-        return EmailHealthResponse(
+        return MailHealthResponse(
             domain=domain,
             healthy=False,
             status="unhealthy",
@@ -183,13 +183,13 @@ def check_email_health(email: str) -> EmailHealthResponse:
     smtp_reachable = True
     if not _smtp_ehlo_ok(ip_address):
         reason = "SMTP did not respond to EHLO"
-        checks = EmailHealthChecks(
+        checks = MailHealthChecks(
             mx_records_found=mx_records_found,
             mx_resolves=mx_resolves,
             smtp_reachable=smtp_reachable,
             smtp_handshake_ok=smtp_handshake_ok,
         )
-        return EmailHealthResponse(
+        return MailHealthResponse(
             domain=domain,
             healthy=False,
             status="unhealthy",
@@ -198,13 +198,13 @@ def check_email_health(email: str) -> EmailHealthResponse:
         )
 
     smtp_handshake_ok = True
-    checks = EmailHealthChecks(
+    checks = MailHealthChecks(
         mx_records_found=mx_records_found,
         mx_resolves=mx_resolves,
         smtp_reachable=smtp_reachable,
         smtp_handshake_ok=smtp_handshake_ok,
     )
-    return EmailHealthResponse(
+    return MailHealthResponse(
         domain=domain,
         healthy=True,
         status="healthy",

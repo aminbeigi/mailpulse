@@ -9,37 +9,37 @@ def client() -> TestClient:
     return TestClient(create_app())
 
 
-def test_email_health_missing_email(client: TestClient) -> None:
+def test_mail_health_missing_email(client: TestClient) -> None:
     response = client.get("/v1/mail-health")
     assert response.status_code == 422
 
 
-def test_email_health_invalid_not_an_email(client: TestClient) -> None:
+def test_mail_health_invalid_not_an_email(client: TestClient) -> None:
     response = client.get("/v1/mail-health", params={"email": "not-an-email"})
     assert response.status_code == 422
 
 
-def test_email_health_invalid_empty(client: TestClient) -> None:
+def test_mail_health_invalid_empty(client: TestClient) -> None:
     response = client.get("/v1/mail-health", params={"email": ""})
     assert response.status_code == 422
 
 
-def test_email_health_invalid_no_domain_dot(client: TestClient) -> None:
+def test_mail_health_invalid_no_domain_dot(client: TestClient) -> None:
     response = client.get("/v1/mail-health", params={"email": "a@b"})
     assert response.status_code == 422
 
 
-def test_email_health_invalid_a_at(client: TestClient) -> None:
+def test_mail_health_invalid_a_at(client: TestClient) -> None:
     response = client.get("/v1/mail-health", params={"email": "a@"})
     assert response.status_code == 422
 
 
-def test_email_health_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mail_health_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_resolve_mx(domain: str) -> list[tuple[int, str]]:
         assert domain == "aminbeigi.com"
         return []
 
-    monkeypatch.setattr("mailpulse.services.email_health._resolve_mx", fake_resolve_mx)
+    monkeypatch.setattr("mailpulse.services.mail_health._resolve_mx", fake_resolve_mx)
     client = TestClient(create_app())
     response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
@@ -58,7 +58,7 @@ def test_email_health_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
-def test_email_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mail_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_resolve_mx(domain: str) -> list[tuple[int, str]]:
         assert domain == "aminbeigi.com"
         return [(10, "mx.example.com")]
@@ -67,9 +67,9 @@ def test_email_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> No
         assert host == "mx.example.com"
         return None
 
-    monkeypatch.setattr("mailpulse.services.email_health._resolve_mx", fake_resolve_mx)
+    monkeypatch.setattr("mailpulse.services.mail_health._resolve_mx", fake_resolve_mx)
     monkeypatch.setattr(
-        "mailpulse.services.email_health._resolve_ip_for_mx_host",
+        "mailpulse.services.mail_health._resolve_ip_for_mx_host",
         fake_resolve_ip_for_mx_host,
     )
     client = TestClient(create_app())
@@ -90,7 +90,7 @@ def test_email_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> No
     }
 
 
-def test_email_health_smtp_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mail_health_smtp_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_resolve_mx(domain: str) -> list[tuple[int, str]]:
         return [(10, "mx.example.com")]
 
@@ -101,13 +101,13 @@ def test_email_health_smtp_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
         assert address == "10.0.0.1"
         return False
 
-    monkeypatch.setattr("mailpulse.services.email_health._resolve_mx", fake_resolve_mx)
+    monkeypatch.setattr("mailpulse.services.mail_health._resolve_mx", fake_resolve_mx)
     monkeypatch.setattr(
-        "mailpulse.services.email_health._resolve_ip_for_mx_host",
+        "mailpulse.services.mail_health._resolve_ip_for_mx_host",
         fake_resolve_ip_for_mx_host,
     )
     monkeypatch.setattr(
-        "mailpulse.services.email_health._probe_smtp_socket",
+        "mailpulse.services.mail_health._probe_smtp_socket",
         fake_probe_smtp_socket,
     )
     client = TestClient(create_app())
@@ -128,7 +128,7 @@ def test_email_health_smtp_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
-def test_email_health_ehlo_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mail_health_ehlo_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_resolve_mx(domain: str) -> list[tuple[int, str]]:
         return [(10, "mx.example.com")]
 
@@ -141,16 +141,16 @@ def test_email_health_ehlo_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_smtp_ehlo_ok(address: str) -> bool:
         return False
 
-    monkeypatch.setattr("mailpulse.services.email_health._resolve_mx", fake_resolve_mx)
+    monkeypatch.setattr("mailpulse.services.mail_health._resolve_mx", fake_resolve_mx)
     monkeypatch.setattr(
-        "mailpulse.services.email_health._resolve_ip_for_mx_host",
+        "mailpulse.services.mail_health._resolve_ip_for_mx_host",
         fake_resolve_ip_for_mx_host,
     )
     monkeypatch.setattr(
-        "mailpulse.services.email_health._probe_smtp_socket",
+        "mailpulse.services.mail_health._probe_smtp_socket",
         fake_probe_smtp_socket,
     )
-    monkeypatch.setattr("mailpulse.services.email_health._smtp_ehlo_ok", fake_smtp_ehlo_ok)
+    monkeypatch.setattr("mailpulse.services.mail_health._smtp_ehlo_ok", fake_smtp_ehlo_ok)
     client = TestClient(create_app())
     response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
@@ -169,7 +169,7 @@ def test_email_health_ehlo_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
-def test_email_health_all_checks_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mail_health_all_checks_pass(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_resolve_mx(domain: str) -> list[tuple[int, str]]:
         return [(10, "mx.example.com")]
 
@@ -182,16 +182,16 @@ def test_email_health_all_checks_pass(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_smtp_ehlo_ok(address: str) -> bool:
         return True
 
-    monkeypatch.setattr("mailpulse.services.email_health._resolve_mx", fake_resolve_mx)
+    monkeypatch.setattr("mailpulse.services.mail_health._resolve_mx", fake_resolve_mx)
     monkeypatch.setattr(
-        "mailpulse.services.email_health._resolve_ip_for_mx_host",
+        "mailpulse.services.mail_health._resolve_ip_for_mx_host",
         fake_resolve_ip_for_mx_host,
     )
     monkeypatch.setattr(
-        "mailpulse.services.email_health._probe_smtp_socket",
+        "mailpulse.services.mail_health._probe_smtp_socket",
         fake_probe_smtp_socket,
     )
-    monkeypatch.setattr("mailpulse.services.email_health._smtp_ehlo_ok", fake_smtp_ehlo_ok)
+    monkeypatch.setattr("mailpulse.services.mail_health._smtp_ehlo_ok", fake_smtp_ehlo_ok)
     client = TestClient(create_app())
     response = client.get("/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
