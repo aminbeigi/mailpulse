@@ -1,5 +1,11 @@
 # MailPulse
 
+MailPulse is a backend tool that checks whether your **mail server** and domain are set up so incoming mail can be delivered (MX records, DNS, and basic SMTP checks).
+
+It came out of a real incident: my mail server failed without me noticing. For several days, messages to my domain were not delivered, and I missed important email.
+
+MailPulse is meant to surface that kind of failure early, before silent delivery loss drags on.
+
 A modular FastAPI service managed by [uv](https://docs.astral.sh/uv/) and linted/formatted by [ruff](https://docs.astral.sh/ruff/).
 
 ## Requirements
@@ -58,17 +64,13 @@ docker build -t mailpulse .
 docker run --rm -p 8000:8000 mailpulse
 ```
 
-Open `http://127.0.0.1:8000/docs` or override settings with `-e`, for example:
-
-```bash
-docker run --rm -p 8080:8080 -e MAILPULSE_PORT=8080 mailpulse
-```
 
 
-| Endpoint      | Description  |
-| ------------- | ------------ |
-| `GET /health` | Health check |
-| `GET /docs`   | Swagger UI   |
+| Endpoint                 | Description                                      |
+| ------------------------ | ------------------------------------------------ |
+| `GET /health`            | Health check                                     |
+| `GET /v1/mail-health`    | Mail-receiving health for an email’s domain      |
+| `GET /docs`              | Swagger UI                                       |
 
 
 ## Configuration
@@ -118,12 +120,16 @@ mailpulse/
 ├── api/
 │   ├── router.py      # Aggregates all route modules
 │   └── routes/
-│       └── health.py  # GET /health
+│       ├── health.py  # GET /health
+│       └── email_health.py  # GET /v1/mail-health
 ├── core/
 │   └── config.py      # Settings via pydantic-settings
 ├── schemas/           # Pydantic request/response models
+│   └── email_health.py
 └── services/          # Business logic
+    └── email_health.py
 tests/
-└── test_health.py     # Example API test (GET /health)
+├── test_health.py     # Example API test (GET /health)
+└── test_email_health.py  # GET /v1/mail-health
 ```
 

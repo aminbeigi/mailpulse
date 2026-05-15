@@ -13,6 +13,10 @@ After making code changes in this repository, unless the user explicitly says no
 
 When you add new functionality (routes, services, core behavior, or other user-facing or contract-changing behavior), add or extend automated tests in the same change so the new behavior is covered, unless the user explicitly says not to.
 
+# README updates
+
+After making changes, update `README.md` in the same change when needed so it stays accurate. That includes new or changed setup steps, configuration or environment variables, API surface, CLI usage, or anything else a reader would reasonably expect to find there. Skip README edits when the change does not affect what the README documents, unless the user asks otherwise.
+
 # Control flow
 
 Avoid one-line if/else forms (including ternary expressions). Use a normal `if` / `else` block so branches stay easy to read and step through.
