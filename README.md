@@ -11,14 +11,23 @@ I plan to add a bunch of useful endpoints in this API that I can use in my autom
 The app is hosted at [https://mailpulse.aminbeigi.com](https://mailpulse.aminbeigi.com). 
 To get started, open the API docs at [https://mailpulse.aminbeigi.com/api/v1/docs](https://mailpulse.aminbeigi.com/api/v1/docs).
 
-## Requirements
+## Local development
+
+Clone the repo and work on MailPulse on your machine—install dependencies, run the API, test, and lint. For the deployed API, use [mailpulse.aminbeigi.com](https://mailpulse.aminbeigi.com) instead.
+
+### Requirements
 
 - Python 3.12+
+- [Git](https://git-scm.com/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- [Docker](https://docs.docker.com/get-docker/) 
 
-## Setup
+### Setup
 
 ```bash
+git clone https://github.com/aminbeigi/mailpulse.git
+cd mailpulse
+
 # Install dependencies (including dev tools) into a managed .venv
 uv sync --group dev
 
@@ -26,7 +35,7 @@ uv sync --group dev
 cp .env.example .env
 ```
 
-## Run
+### Run
 
 ```bash
 uv run python -m mailpulse
@@ -34,7 +43,40 @@ uv run python -m mailpulse
 
 The server starts at `http://127.0.0.1:8000` by default.
 
-## Tests
+### Docker
+
+Build and run the API in a container (the image sets `MAILPULSE_HOST=0.0.0.0` so the server accepts connections from outside the container):
+
+```bash
+docker build -t mailpulse:latest .
+
+docker run --rm -p 8000:8000 mailpulse
+```
+
+### Configuration
+
+All settings are read from environment variables (or a `.env` file) with the `MAILPULSE_` prefix:
+
+| Variable             | Default     | Description         |
+| -------------------- | ----------- | ------------------- |
+| `MAILPULSE_HOST`     | `127.0.0.1` | Bind host           |
+| `MAILPULSE_PORT`     | `8000`      | Bind port           |
+| `MAILPULSE_RELOAD`   | `false`     | Enable hot-reload   |
+| `MAILPULSE_APP_NAME` | `MailPulse` | Application name    |
+| `MAILPULSE_VERSION`  | `0.1.0`     | Application version |
+
+### Endpoints
+
+When running locally, the API exposes the same routes as production (base URL `http://127.0.0.1:8000`):
+
+| Endpoint                   | Description                                 |
+| -------------------------- | ------------------------------------------- |
+| `GET /api/v1/health`       | Health check                                |
+| `GET /api/v1/mail-health`  | Mail-receiving health for an email’s domain |
+| `GET /api/v1/docs`         | Swagger UI                                  |
+| `GET /api/v1/openapi.json` | OpenAPI schema                              |
+
+### Tests
 
 Automated tests live in the top-level `tests/` directory (for example `tests/test_health.py`). They use [pytest](https://docs.pytest.org/) together with FastAPI’s test client (via [httpx](https://www.python-httpx.org/)).
 
@@ -51,40 +93,7 @@ uv run pytest tests/test_health.py
 uv run pytest tests/test_health.py::test_health_returns_ok
 ```
 
-## Docker
-
-Build and run the API in a container (the image sets `MAILPULSE_HOST=0.0.0.0` so the server accepts connections from outside the container):
-
-```bash
-docker build -t mailpulse:latest .
-
-docker run --rm -p 8000:8000 mailpulse
-```
-
-
-| Endpoint                   | Description                                 |
-| -------------------------- | ------------------------------------------- |
-| `GET /api/v1/health`       | Health check                                |
-| `GET /api/v1/mail-health`  | Mail-receiving health for an email’s domain |
-| `GET /api/v1/docs`         | Swagger UI                                  |
-| `GET /api/v1/openapi.json` | OpenAPI schema                              |
-
-
-## Configuration
-
-All settings are read from environment variables (or a `.env` file) with the `MAILPULSE_` prefix:
-
-
-| Variable             | Default     | Description         |
-| -------------------- | ----------- | ------------------- |
-| `MAILPULSE_HOST`     | `127.0.0.1` | Bind host           |
-| `MAILPULSE_PORT`     | `8000`      | Bind port           |
-| `MAILPULSE_RELOAD`   | `false`     | Enable hot-reload   |
-| `MAILPULSE_APP_NAME` | `MailPulse` | Application name    |
-| `MAILPULSE_VERSION`  | `0.1.0`     | Application version |
-
-
-## Lint & Format
+### Lint & format
 
 ```bash
 # Check for issues
@@ -97,7 +106,7 @@ uv run ruff check --fix .
 uv run ruff format .
 ```
 
-## Pre-commit
+### Pre-commit
 
 ```bash
 # Install hooks (run once after cloning)
@@ -192,4 +201,5 @@ Amin Beigi (yours truly)
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for the full text.
+This project is licensed under the MIT License.
+See [LICENSE](LICENSE) for the full text.
