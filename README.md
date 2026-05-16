@@ -8,12 +8,12 @@ MailPulse is meant to surface that kind of failure early, before silent delivery
 
 I plan to add a bunch of useful endpoints in this API that I can use in my automations. I envision this repo to be sort of be like a suite of tools for confirming mail server health.
 
-The app is hosted at [https://mailpulse.aminbeigi.com](https://mailpulse.aminbeigi.com). 
-To get started, open the API docs at [https://mailpulse.aminbeigi.com/api/v1/docs](https://mailpulse.aminbeigi.com/api/v1/docs).
+**Live API:**: https://mailpulse.aminbeigi.com
+**Docs**: (https://mailpulse.aminbeigi.com/api/v1/docs)
 
 ## Local development
 
-Clone the repo and work on MailPulse on your machine—install dependencies, run the API, test, and lint. For the deployed API, use [mailpulse.aminbeigi.com](https://mailpulse.aminbeigi.com) instead.
+Clone the repo and work on MailPulse on your machine—install dependencies, run the API, test, and lint.
 
 ### Requirements
 
@@ -97,13 +97,13 @@ uv run pytest tests/test_health.py::test_health_returns_ok
 
 ```bash
 # Check for issues
-uv run ruff check .
+uv run ruff check mailpulse
 
 # Auto-fix issues
-uv run ruff check --fix .
+uv run ruff check --fix mailpulse
 
 # Format code
-uv run ruff format .
+uv run ruff format mailpulse
 ```
 
 ### Pre-commit
