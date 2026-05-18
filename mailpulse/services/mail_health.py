@@ -1,16 +1,12 @@
 """Mail receiving health checks for email domains.
 
-This module performs synchronous DNS and SMTP probes to estimate whether a
-domain is configured to accept inbound mail: MX record discovery, resolution
-of the preferred MX host, TCP connectivity on port 25, and SMTP EHLO
-validation.
+This module performs synchronous DNS probes to estimate whether a domain is
+configured to accept inbound mail: MX record discovery and resolution of the
+preferred MX host to an IP address.
 
 The public entry point is :func:`check_mail_health`, which returns a
 structured :class:`~mailpulse.schemas.mail_health.MailHealthResponse`.
 """
-
-import smtplib
-import socket
 
 import dns.exception
 import dns.resolver
@@ -18,8 +14,6 @@ import dns.resolver
 from mailpulse.schemas.mail_health import MailHealthChecks, MailHealthResponse
 
 DNS_TIMEOUT_SECONDS = 5
-SMTP_TIMEOUT_SECONDS = 10
-SMTP_LOCAL_HOSTNAME = "mailpulse.local"
 
 
 def _parse_domain_from_email(email: str) -> str:
@@ -131,55 +125,11 @@ def _resolve_ip_for_mx_host(host: str) -> str | None:
     return None
 
 
-def _probe_smtp_socket(address: str) -> bool:
-    """Test TCP connectivity to SMTP port 25.
-
-    Args:
-        address: IP address or hostname to connect to.
-
-    Returns:
-        ``True`` if a TCP connection to port 25 succeeds within the
-        configured SMTP timeout; ``False`` otherwise.
-    """
-    try:
-        sock = socket.create_connection((address, 25), timeout=SMTP_TIMEOUT_SECONDS)
-    except OSError:
-        return False
-    else:
-        sock.close()
-        return True
-
-
-def _smtp_ehlo_ok(address: str) -> bool:
-    """Verify an SMTP server responds successfully to EHLO.
-
-    Args:
-        address: IP address or hostname of the SMTP server.
-
-    Returns:
-        ``True`` if EHLO completes with an SMTP response code in the
-        200--399 range; ``False`` on connection errors or other codes.
-    """
-    try:
-        with smtplib.SMTP(
-            host=address,
-            port=25,
-            timeout=SMTP_TIMEOUT_SECONDS,
-            local_hostname=SMTP_LOCAL_HOSTNAME,
-        ) as smtp:
-            code, _message = smtp.ehlo()
-    except OSError:
-        return False
-    return 200 <= code < 400
-
-
 def check_mail_health(email: str) -> MailHealthResponse:
     """Assess whether mail can likely be received for an email domain.
 
-    Runs a staged pipeline: MX lookup, A/AAAA resolution for the
-    highest-priority MX, TCP reachability on port 25, and an SMTP EHLO
-    handshake. Checks after the first failure are left ``False`` in the
-    response.
+    Runs MX lookup and A/AAAA resolution for the highest-priority MX host.
+    Checks after the first failure are left ``False`` in the response.
 
     Args:
         email: Email address whose domain is evaluated.
@@ -197,8 +147,6 @@ def check_mail_health(email: str) -> MailHealthResponse:
 
     mx_records_found = False
     mx_resolves = False
-    smtp_reachable = False
-    smtp_handshake_ok = False
     reason: str | None = None
 
     mx_rows = _resolve_mx(domain)
@@ -206,8 +154,6 @@ def check_mail_health(email: str) -> MailHealthResponse:
         checks = MailHealthChecks(
             mx_records_found=mx_records_found,
             mx_resolves=mx_resolves,
-            smtp_reachable=smtp_reachable,
-            smtp_handshake_ok=smtp_handshake_ok,
         )
         return MailHealthResponse(
             domain=domain,
@@ -225,8 +171,6 @@ def check_mail_health(email: str) -> MailHealthResponse:
         checks = MailHealthChecks(
             mx_records_found=mx_records_found,
             mx_resolves=mx_resolves,
-            smtp_reachable=smtp_reachable,
-            smtp_handshake_ok=smtp_handshake_ok,
         )
         return MailHealthResponse(
             domain=domain,
@@ -237,45 +181,9 @@ def check_mail_health(email: str) -> MailHealthResponse:
         )
 
     mx_resolves = True
-    if not _probe_smtp_socket(ip_address):
-        reason = "SMTP unreachable on port 25"
-        checks = MailHealthChecks(
-            mx_records_found=mx_records_found,
-            mx_resolves=mx_resolves,
-            smtp_reachable=smtp_reachable,
-            smtp_handshake_ok=smtp_handshake_ok,
-        )
-        return MailHealthResponse(
-            domain=domain,
-            healthy=False,
-            status="unhealthy",
-            reason=reason,
-            checks=checks,
-        )
-
-    smtp_reachable = True
-    if not _smtp_ehlo_ok(ip_address):
-        reason = "SMTP did not respond to EHLO"
-        checks = MailHealthChecks(
-            mx_records_found=mx_records_found,
-            mx_resolves=mx_resolves,
-            smtp_reachable=smtp_reachable,
-            smtp_handshake_ok=smtp_handshake_ok,
-        )
-        return MailHealthResponse(
-            domain=domain,
-            healthy=False,
-            status="unhealthy",
-            reason=reason,
-            checks=checks,
-        )
-
-    smtp_handshake_ok = True
     checks = MailHealthChecks(
         mx_records_found=mx_records_found,
         mx_resolves=mx_resolves,
-        smtp_reachable=smtp_reachable,
-        smtp_handshake_ok=smtp_handshake_ok,
     )
     return MailHealthResponse(
         domain=domain,
