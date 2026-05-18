@@ -72,7 +72,7 @@ When running locally, the API exposes the same routes as production (base URL `h
 | Endpoint                   | Description                                 |
 | -------------------------- | ------------------------------------------- |
 | `GET /api/v1/health`       | Health check                                |
-| `GET /api/v1/mail-health`  | DNS-based mail-receiving health for an email’s domain (MX + resolution) |
+| `GET /api/v1/mail-health`  | Suite of DNS- and WHOIS-based receiving-side health checks for an email’s domain (MX presence, null-MX, RFC 5321 MX target validity, MX resolution, multiple-MX resilience, SPF, DMARC, domain-expiry) |
 | `GET /api/v1/docs`         | Swagger UI                                  |
 | `GET /api/v1/openapi.json` | OpenAPI schema                              |
 
@@ -147,7 +147,9 @@ MailPulse is **stateless**: the API keeps no server-side sessions, in-memory use
 
 The production API runs on **AWS ECS**. AWS blocks outbound **TCP port 25** from ECS tasks (and from EC2 by default), so MailPulse cannot probe remote mail servers over SMTP from that environment.
 
-`GET /api/v1/mail-health` therefore performs **DNS-only** checks: it looks up MX records for the domain and verifies that the highest-priority MX host resolves to an IP address. It does **not** open connections to port 25 or run an SMTP EHLO handshake. A “healthy” result means DNS is configured plausibly for inbound mail, not that a live SMTP server is accepting connections.
+`GET /api/v1/mail-health` performs **DNS and WHOIS** checks: MX record presence, null-MX detection (RFC 7505), RFC 5321 MX target validity (no IP literals, no CNAMEs), top-MX resolution, multiple-MX resilience, SPF (`v=spf1`) and DMARC (`v=DMARC1`) record presence, and domain expiry via WHOIS. It does **not** open connections to port 25 or run an SMTP EHLO handshake. A `"healthy"` result means DNS and registration are configured plausibly for inbound mail, not that a live SMTP server is accepting connections.
+
+The response contains a single `status` field (`"healthy"` or `"unhealthy"`) and a `checks` list where each entry is `{name, passed, detail}`. Checks whose data could not be obtained (for example, WHOIS is unreachable for some TLDs) are omitted from the list rather than reported as failed.
 
 If you need live SMTP reachability checks, run MailPulse (or a separate checker) somewhere that allows outbound port 25—for example a VPS outside AWS, or an environment where you have requested AWS removal of the port 25 restriction.
 
