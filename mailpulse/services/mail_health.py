@@ -57,6 +57,33 @@ def _parse_domain_from_email(email: str) -> str:
     return domain.lower()
 
 
+def _validate_domain(domain: str) -> str:
+    """Validate and normalise a bare domain name.
+
+    Args:
+        domain: Domain name to validate. Leading and trailing whitespace is
+            stripped before validation.
+
+    Returns:
+        Lowercased domain string.
+
+    Raises:
+        ValueError: If the string is empty, contains an ``@``, or has no
+            dot (i.e. is not a valid domain).
+    """
+    stripped = domain.strip()
+    if not stripped:
+        msg = "Invalid domain"
+        raise ValueError(msg)
+    if "@" in stripped:
+        msg = "Invalid domain: use the 'email' parameter to pass an email address"
+        raise ValueError(msg)
+    if "." not in stripped:
+        msg = "Invalid domain"
+        raise ValueError(msg)
+    return stripped.lower()
+
+
 def _normalize_mx_exchange(exchange: str) -> str:
     """Normalize an MX exchange hostname from DNS text form.
 
@@ -269,8 +296,8 @@ def _resolve_domain_expiry(domain: str) -> datetime | None:
         return None
 
 
-def check_mail_health(email: str) -> MailHealthResponse:
-    """Assess whether mail can likely be received for an email domain.
+def check_mail_health(domain: str) -> MailHealthResponse:
+    """Assess whether mail can likely be received for a domain.
 
     Runs a suite of DNS and WHOIS checks in sequence. Each check is
     emitted only when its prerequisites have passed. Checks whose data
@@ -293,18 +320,15 @@ def check_mail_health(email: str) -> MailHealthResponse:
       unavailable).
 
     Args:
-        email: Email address whose domain is evaluated.
+        domain: Validated, lowercased domain name to evaluate (e.g.
+            ``example.com``). Use :func:`_parse_domain_from_email` or
+            :func:`_validate_domain` to obtain this value from caller input.
 
     Returns:
         A :class:`~mailpulse.schemas.mail_health.MailHealthResponse` with
         a ``status`` of ``"healthy"`` or ``"unhealthy"`` and a list of
         per-check results.
-
-    Raises:
-        ValueError: If ``email`` fails validation in
-            :func:`_parse_domain_from_email`.
     """
-    domain = _parse_domain_from_email(email)
     checks: list[MailHealthCheck] = []
 
     mx_rows = _resolve_mx(domain)
