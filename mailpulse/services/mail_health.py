@@ -1,4 +1,13 @@
-"""Synchronous mail-receiving health checks (MX, DNS, SMTP EHLO) for an email domain."""
+"""Mail receiving health checks for email domains.
+
+This module performs synchronous DNS and SMTP probes to estimate whether a
+domain is configured to accept inbound mail: MX record discovery, resolution
+of the preferred MX host, TCP connectivity on port 25, and SMTP EHLO
+validation.
+
+The public entry point is :func:`check_mail_health`, which returns a
+structured :class:`~mailpulse.schemas.mail_health.MailHealthResponse`.
+"""
 
 import smtplib
 import socket
@@ -14,10 +23,19 @@ SMTP_LOCAL_HOSTNAME = "mailpulse.local"
 
 
 def _parse_domain_from_email(email: str) -> str:
-    """Return the domain part of *email* after basic validation.
+    """Extract and validate the domain part of an email address.
 
-    Splits on the last ``@``, requires non-empty local and domain parts, and requires
-    at least one dot in the domain. Raises ``ValueError`` if validation fails.
+    Args:
+        email: Email address to parse. Leading and trailing whitespace is
+            stripped before validation.
+
+    Returns:
+        Lowercased domain part of the email (the portion after the last
+        ``@``).
+
+    Raises:
+        ValueError: If the address has no ``@``, empty local or domain
+            parts, or a domain without at least one dot.
     """
     stripped = email.strip()
     if "@" not in stripped:
@@ -34,17 +52,32 @@ def _parse_domain_from_email(email: str) -> str:
 
 
 def _normalize_mx_exchange(exchange: str) -> str:
-    """Strip a trailing dot from a DNS MX exchange hostname, if present."""
+    """Normalize an MX exchange hostname from DNS text form.
+
+    Args:
+        exchange: MX exchange hostname as returned by DNS (may end with a
+            trailing dot denoting the root zone).
+
+    Returns:
+        The hostname with a single trailing dot removed, if present;
+        otherwise the original string unchanged.
+    """
     if exchange.endswith("."):
         return exchange[:-1]
     return exchange
 
 
 def _resolve_mx(domain: str) -> list[tuple[int, str]]:
-    """Look up MX records for *domain* and return ``(preference, host)`` rows sorted for delivery.
+    """Resolve MX records for a mail domain.
 
-    Rows are ordered by ascending preference, then hostname, so the first row is the
-    chosen primary MX. Returns an empty list when lookup fails or there are no MX RRs.
+    Args:
+        domain: Mail domain to look up (for example ``example.com``).
+
+    Returns:
+        A list of ``(preference, host)`` tuples sorted by ascending
+        preference then hostname. The first entry is the highest-priority
+        MX. Returns an empty list when lookup fails or no MX records
+        exist.
     """
     resolver = dns.resolver.Resolver()
     resolver.timeout = DNS_TIMEOUT_SECONDS
@@ -69,7 +102,17 @@ def _resolve_mx(domain: str) -> list[tuple[int, str]]:
 
 
 def _resolve_ip_for_mx_host(host: str) -> str | None:
-    """Resolve *host* to an IPv4 or IPv6 address string, or return ``None`` if none found."""
+    """Resolve an MX host to an IP address.
+
+    Tries A records first, then AAAA.
+
+    Args:
+        host: MX exchange hostname to resolve.
+
+    Returns:
+        The first IPv4 or IPv6 address string found, or ``None`` if
+        resolution fails or yields no addresses.
+    """
     resolver = dns.resolver.Resolver()
     resolver.timeout = DNS_TIMEOUT_SECONDS
     resolver.lifetime = DNS_TIMEOUT_SECONDS
@@ -89,7 +132,15 @@ def _resolve_ip_for_mx_host(host: str) -> str | None:
 
 
 def _probe_smtp_socket(address: str) -> bool:
-    """Return whether TCP port 25 on *address* accepts a connection within the SMTP timeout."""
+    """Test TCP connectivity to SMTP port 25.
+
+    Args:
+        address: IP address or hostname to connect to.
+
+    Returns:
+        ``True`` if a TCP connection to port 25 succeeds within the
+        configured SMTP timeout; ``False`` otherwise.
+    """
     try:
         sock = socket.create_connection((address, 25), timeout=SMTP_TIMEOUT_SECONDS)
     except OSError:
@@ -100,7 +151,15 @@ def _probe_smtp_socket(address: str) -> bool:
 
 
 def _smtp_ehlo_ok(address: str) -> bool:
-    """Return whether an SMTP server at *address*:25 completes EHLO with a 2xx/3xx code."""
+    """Verify an SMTP server responds successfully to EHLO.
+
+    Args:
+        address: IP address or hostname of the SMTP server.
+
+    Returns:
+        ``True`` if EHLO completes with an SMTP response code in the
+        200--399 range; ``False`` on connection errors or other codes.
+    """
     try:
         with smtplib.SMTP(
             host=address,
@@ -115,10 +174,24 @@ def _smtp_ehlo_ok(address: str) -> bool:
 
 
 def check_mail_health(email: str) -> MailHealthResponse:
-    """Run MX, resolution, reachability, and EHLO checks for the domain in *email*.
+    """Assess whether mail can likely be received for an email domain.
 
-    Stops at the first failed step; later check flags remain ``False``. Raises
-    ``ValueError`` when *email* is not accepted by :func:`_parse_domain_from_email`.
+    Runs a staged pipeline: MX lookup, A/AAAA resolution for the
+    highest-priority MX, TCP reachability on port 25, and an SMTP EHLO
+    handshake. Checks after the first failure are left ``False`` in the
+    response.
+
+    Args:
+        email: Email address whose domain is evaluated.
+
+    Returns:
+        A :class:`~mailpulse.schemas.mail_health.MailHealthResponse` with
+        per-step check flags, overall health status, and an optional
+        failure reason.
+
+    Raises:
+        ValueError: If ``email`` fails validation in
+            :func:`_parse_domain_from_email`.
     """
     domain = _parse_domain_from_email(email)
 

@@ -3,12 +3,6 @@ description: Project-wide conventions and workflow for Mailpulse
 alwaysApply: true
 ---
 
-# Ruff after edits
-
-After making code changes in this repository, unless the user explicitly says not to, run:
-
-`uv run ruff check --fix mailpulse && uv run ruff format mailpulse`
-
 # Tests for new functionality
 
 When you add new functionality (routes, services, core behavior, or other user-facing or contract-changing behavior), add or extend automated tests in the same change so the new behavior is covered, unless the user explicitly says not to.
@@ -16,19 +10,3 @@ When you add new functionality (routes, services, core behavior, or other user-f
 # README updates
 
 After making changes, update `README.md` in the same change when needed so it stays accurate. That includes new or changed setup steps, configuration or environment variables, API surface, CLI usage, or anything else a reader would reasonably expect to find there. Skip README edits when the change does not affect what the README documents, unless the user asks otherwise.
-
-# Control flow
-
-Avoid one-line if/else forms (including ternary expressions). Use a normal `if` / `else` block so branches stay easy to read and step through.
-
-```python
-# bad — ternary crammed on one line
-timeout = short_timeout if fast_path else long_timeout
-
-# good — explicit branches
-if fast_path:
-    timeout = short_timeout
-else:
-    timeout = long_timeout
-```
-

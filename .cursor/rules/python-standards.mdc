@@ -1,0 +1,76 @@
+---
+description: Python standards (Ruff, docstrings, control flow)
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Ruff after edits
+
+After making code changes in this repository, unless the user explicitly says not to, run:
+
+`uv run ruff check --fix mailpulse && uv run ruff format mailpulse`
+
+# Google Python docstrings
+
+Follow the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for docstrings whenever you **create a new Python module** or **add a function or method** in this project. Add or update docstrings in the same change—do not leave new code undocumented.
+
+## Module docstrings
+
+Every new `.py` file must start with a module docstring:
+
+- First line: one-line summary.
+- Blank line, then an extended description (purpose, main entry points, or how the module fits in the app).
+
+## Function and method docstrings
+
+Every new function or method needs:
+
+- **Summary line** — imperative mood, ends with a period.
+- **Blank line**, then optional extra paragraphs for non-obvious behavior.
+- **`Args:`** — one entry per parameter (purpose only when the signature already has type hints).
+- **`Returns:`** — describe the return value when the function returns something meaningful.
+- **`Raises:`** — list exceptions callers should handle when the function raises them.
+
+Do not duplicate parameter types in `Args:` when type annotations are present.
+
+## When to update existing docstrings
+
+Update docstrings when you change a function’s contract: parameters, return value, side effects, or raised exceptions.
+
+## Example
+
+```python
+"""Utilities for validating and normalizing records.
+
+Exposes :func:`normalize_record` as the primary entry point.
+"""
+
+
+def normalize_record(data: dict[str, str]) -> Record:
+    """Validate and normalize a raw record into a structured model.
+
+    Args:
+        data: Raw key-value fields from the caller.
+
+    Returns:
+        A validated record with normalized field values.
+
+    Raises:
+        ValueError: If required fields are missing or invalid.
+    """
+```
+
+# Control flow
+
+Avoid one-line if/else forms (including ternary expressions). Use a normal `if` / `else` block so branches stay easy to read and step through.
+
+```python
+# bad — ternary crammed on one line
+timeout = short_timeout if fast_path else long_timeout
+
+# good — explicit branches
+if fast_path:
+    timeout = short_timeout
+else:
+    timeout = long_timeout
+```
