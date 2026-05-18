@@ -1,3 +1,8 @@
+"""FastAPI application factory for MailPulse.
+
+Exposes :func:`create_app` as the ASGI entry point used by uvicorn and tests.
+"""
+
 from fastapi import FastAPI
 
 from mailpulse.api.router import api_router
@@ -5,6 +10,11 @@ from mailpulse.core.config import get_settings
 
 
 def create_app() -> FastAPI:
+    """Build and configure the MailPulse FastAPI application.
+
+    Returns:
+        A FastAPI instance with API routes mounted under ``/api/v1``.
+    """
     settings = get_settings()
 
     app = FastAPI(

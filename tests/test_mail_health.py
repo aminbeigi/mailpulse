@@ -6,7 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mailpulse.app import create_app
-from mailpulse.services.mail_health import _validate_domain
 
 
 @pytest.fixture
@@ -82,38 +81,8 @@ def test_mail_health_domain_invalid_no_dot(client: TestClient) -> None:
 
 
 def test_mail_health_domain_invalid_contains_at(client: TestClient) -> None:
-    response = client.get(
-        "/api/v1/mail-health", params={"domain": "me@aminbeigi.com"}
-    )
+    response = client.get("/api/v1/mail-health", params={"domain": "me@aminbeigi.com"})
     assert response.status_code == 422
-
-
-# ---------------------------------------------------------------------------
-# Unit tests for _validate_domain
-# ---------------------------------------------------------------------------
-
-
-def test_validate_domain_normalises_case() -> None:
-    assert _validate_domain("Example.COM") == "example.com"
-
-
-def test_validate_domain_strips_whitespace() -> None:
-    assert _validate_domain("  example.com  ") == "example.com"
-
-
-def test_validate_domain_rejects_empty() -> None:
-    with pytest.raises(ValueError):
-        _validate_domain("")
-
-
-def test_validate_domain_rejects_no_dot() -> None:
-    with pytest.raises(ValueError):
-        _validate_domain("nodot")
-
-
-def test_validate_domain_rejects_at_sign() -> None:
-    with pytest.raises(ValueError):
-        _validate_domain("me@example.com")
 
 
 def test_mail_health_domain_param_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -150,9 +119,11 @@ def test_mail_health_domain_param_all_healthy(monkeypatch: pytest.MonkeyPatch) -
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_txt",
-        lambda name: ["v=spf1 include:example.com ~all"]
-        if not name.startswith("_dmarc")
-        else ["v=DMARC1; p=none"],
+        lambda name: (
+            ["v=spf1 include:example.com ~all"]
+            if not name.startswith("_dmarc")
+            else ["v=DMARC1; p=none"]
+        ),
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_domain_expiry",
@@ -315,9 +286,11 @@ def test_mail_health_single_mx(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_txt",
-        lambda name: ["v=spf1 include:example.com ~all"]
-        if not name.startswith("_dmarc")
-        else ["v=DMARC1; p=none"],
+        lambda name: (
+            ["v=spf1 include:example.com ~all"]
+            if not name.startswith("_dmarc")
+            else ["v=DMARC1; p=none"]
+        ),
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_domain_expiry",
@@ -379,9 +352,7 @@ def test_mail_health_missing_dmarc(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_txt",
-        lambda name: ["v=spf1 include:example.com ~all"]
-        if not name.startswith("_dmarc")
-        else [],
+        lambda name: ["v=spf1 include:example.com ~all"] if not name.startswith("_dmarc") else [],
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_domain_expiry",
@@ -413,9 +384,11 @@ def test_mail_health_domain_expiring_soon(monkeypatch: pytest.MonkeyPatch) -> No
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_txt",
-        lambda name: ["v=spf1 include:example.com ~all"]
-        if not name.startswith("_dmarc")
-        else ["v=DMARC1; p=none"],
+        lambda name: (
+            ["v=spf1 include:example.com ~all"]
+            if not name.startswith("_dmarc")
+            else ["v=DMARC1; p=none"]
+        ),
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_domain_expiry",
@@ -446,9 +419,11 @@ def test_mail_health_domain_expiry_unknown(monkeypatch: pytest.MonkeyPatch) -> N
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_txt",
-        lambda name: ["v=spf1 include:example.com ~all"]
-        if not name.startswith("_dmarc")
-        else ["v=DMARC1; p=none"],
+        lambda name: (
+            ["v=spf1 include:example.com ~all"]
+            if not name.startswith("_dmarc")
+            else ["v=DMARC1; p=none"]
+        ),
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_domain_expiry",
@@ -477,9 +452,11 @@ def test_mail_health_all_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_txt",
-        lambda name: ["v=spf1 include:example.com ~all"]
-        if not name.startswith("_dmarc")
-        else ["v=DMARC1; p=none"],
+        lambda name: (
+            ["v=spf1 include:example.com ~all"]
+            if not name.startswith("_dmarc")
+            else ["v=DMARC1; p=none"]
+        ),
     )
     monkeypatch.setattr(
         "mailpulse.services.mail_health._resolve_domain_expiry",

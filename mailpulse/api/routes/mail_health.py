@@ -7,12 +7,9 @@ exclusive) and delegates to :func:`~mailpulse.services.mail_health.check_mail_he
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
+from mailpulse.core.domains import parse_domain_from_email, validate_domain
 from mailpulse.schemas.mail_health import MailHealthResponse
-from mailpulse.services.mail_health import (
-    _parse_domain_from_email,
-    _validate_domain,
-    check_mail_health,
-)
+from mailpulse.services.mail_health import check_mail_health
 
 router = APIRouter(tags=["mail-health"])
 
@@ -52,9 +49,9 @@ async def get_mail_health(
         )
     try:
         if email is not None:
-            resolved_domain = _parse_domain_from_email(email)
+            resolved_domain = parse_domain_from_email(email)
         else:
-            resolved_domain = _validate_domain(domain)  # type: ignore[arg-type]
+            resolved_domain = validate_domain(domain)  # type: ignore[arg-type]
         return await run_in_threadpool(check_mail_health, resolved_domain)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

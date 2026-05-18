@@ -28,62 +28,6 @@ WHOIS_TIMEOUT_SECONDS = 5
 DOMAIN_EXPIRY_WARN_DAYS = 30
 
 
-def _parse_domain_from_email(email: str) -> str:
-    """Extract and validate the domain part of an email address.
-
-    Args:
-        email: Email address to parse. Leading and trailing whitespace is
-            stripped before validation.
-
-    Returns:
-        Lowercased domain part of the email (the portion after the last
-        ``@``).
-
-    Raises:
-        ValueError: If the address has no ``@``, empty local or domain
-            parts, or a domain without at least one dot.
-    """
-    stripped = email.strip()
-    if "@" not in stripped:
-        msg = "Invalid email address"
-        raise ValueError(msg)
-    local_part, domain = stripped.rsplit("@", 1)
-    if not local_part or not domain:
-        msg = "Invalid email address"
-        raise ValueError(msg)
-    if "." not in domain:
-        msg = "Invalid email address"
-        raise ValueError(msg)
-    return domain.lower()
-
-
-def _validate_domain(domain: str) -> str:
-    """Validate and normalise a bare domain name.
-
-    Args:
-        domain: Domain name to validate. Leading and trailing whitespace is
-            stripped before validation.
-
-    Returns:
-        Lowercased domain string.
-
-    Raises:
-        ValueError: If the string is empty, contains an ``@``, or has no
-            dot (i.e. is not a valid domain).
-    """
-    stripped = domain.strip()
-    if not stripped:
-        msg = "Invalid domain"
-        raise ValueError(msg)
-    if "@" in stripped:
-        msg = "Invalid domain: use the 'email' parameter to pass an email address"
-        raise ValueError(msg)
-    if "." not in stripped:
-        msg = "Invalid domain"
-        raise ValueError(msg)
-    return stripped.lower()
-
-
 def _normalize_mx_exchange(exchange: str) -> str:
     """Normalize an MX exchange hostname from DNS text form.
 
@@ -321,8 +265,9 @@ def check_mail_health(domain: str) -> MailHealthResponse:
 
     Args:
         domain: Validated, lowercased domain name to evaluate (e.g.
-            ``example.com``). Use :func:`_parse_domain_from_email` or
-            :func:`_validate_domain` to obtain this value from caller input.
+            ``example.com``). Use :func:`~mailpulse.core.domains.parse_domain_from_email`
+            or :func:`~mailpulse.core.domains.validate_domain` to obtain this
+            value from caller input.
 
     Returns:
         A :class:`~mailpulse.schemas.mail_health.MailHealthResponse` with

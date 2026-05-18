@@ -8,8 +8,8 @@ MailPulse is meant to surface that kind of failure early, before silent delivery
 
 I plan to add a bunch of useful endpoints in this API that I can use in my automations. I envision this repo to be sort of be like a suite of tools for confirming mail server health.
 
-**Live API:**: https://mailpulse.aminbeigi.com
-**Docs**: (https://mailpulse.aminbeigi.com/api/v1/docs)
+**Live API**: [https://mailpulse.aminbeigi.com](https://mailpulse.aminbeigi.com) 
+**Docs**: [https://mailpulse.aminbeigi.com/api/v1/docs](https://mailpulse.aminbeigi.com/api/v1/docs)
 
 ## Local development
 
@@ -20,7 +20,7 @@ Clone the repo and work on MailPulse on your machine—install dependencies, run
 - Python 3.12+
 - [Git](https://git-scm.com/)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- [Docker](https://docs.docker.com/get-docker/) 
+- [Docker](https://docs.docker.com/get-docker/)
 
 ### Setup
 
@@ -57,6 +57,7 @@ docker run --rm -p 8000:8000 mailpulse
 
 All settings are read from environment variables (or a `.env` file) with the `MAILPULSE_` prefix:
 
+
 | Variable             | Default     | Description         |
 | -------------------- | ----------- | ------------------- |
 | `MAILPULSE_HOST`     | `127.0.0.1` | Bind host           |
@@ -65,16 +66,19 @@ All settings are read from environment variables (or a `.env` file) with the `MA
 | `MAILPULSE_APP_NAME` | `MailPulse` | Application name    |
 | `MAILPULSE_VERSION`  | `0.1.0`     | Application version |
 
+
 ### Endpoints
 
 When running locally, the API exposes the same routes as production (base URL `http://127.0.0.1:8000`):
 
-| Endpoint                   | Description                                 |
-| -------------------------- | ------------------------------------------- |
-| `GET /api/v1/health`       | Health check                                |
+
+| Endpoint                   | Description                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/health`       | Health check                                                                                                                                       |
 | `GET /api/v1/mail-health`  | Suite of DNS- and WHOIS-based receiving-side health checks. Accepts either `?email=you@example.com` or `?domain=example.com` (mutually exclusive). |
-| `GET /api/v1/docs`         | Swagger UI                                  |
-| `GET /api/v1/openapi.json` | OpenAPI schema                              |
+| `GET /api/v1/docs`         | Swagger UI                                                                                                                                         |
+| `GET /api/v1/openapi.json` | OpenAPI schema                                                                                                                                     |
+
 
 ### Tests
 
@@ -116,6 +120,28 @@ uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
+### CI/CD
+
+GitHub Actions runs `[.github/workflows/pipeline.yml](.github/workflows/pipeline.yml)` on every push and pull request to `main`.
+
+**Pull requests and non-`main` pushes**
+
+1. Lint (Ruff).
+2. Run tests (pytest).
+3. Verify the Docker image builds.
+
+Nothing is published or deployed.
+
+**Push to `main`**
+
+1. Lint (Ruff).
+2. Run tests (pytest).
+3. Verify the Docker image builds.
+4. **Build and push** the image to Amazon ECR (tagged with the commit SHA and `latest`).
+5. **Deploy to ECS** — download the current task definition, update only the container image to the new ECR tag, register a new task definition revision, and roll out that revision to the ECS service.
+
+Repository secrets in GitHub (AWS credentials, ECR registry/repo, ECS cluster/service, task definition family, container name) supply the deploy configuration.
+
 ## Project structure
 
 ```
@@ -129,12 +155,14 @@ mailpulse/
 │       ├── health.py  # GET /api/v1/health
 │       └── mail_health.py  # GET /api/v1/mail-health
 ├── core/
-│   └── config.py      # Settings via pydantic-settings
+│   ├── config.py      # Settings via pydantic-settings
+│   └── domains.py     # Email/domain input validation
 ├── schemas/           # Pydantic request/response models
 │   └── mail_health.py
 └── services/          # Business logic
     └── mail_health.py
 tests/
+├── test_domains.py    # Domain/email input validation
 ├── test_health.py     # Example API test (GET /api/v1/health)
 └── test_mail_health.py  # GET /api/v1/mail-health
 ```
@@ -206,7 +234,9 @@ flowchart TB
 ```
 
 
+
 ## Author
+
 Amin Beigi (yours truly)
 
 ## License
