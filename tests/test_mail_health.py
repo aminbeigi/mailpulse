@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mailpulse.app import create_app
+from mailpulse.services.mail_health import _validate_domain
 
 
 @pytest.fixture
@@ -22,9 +23,27 @@ def check_by_name(data: dict, name: str) -> dict | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Input validation — neither / both params
+# ---------------------------------------------------------------------------
+
+
 def test_mail_health_missing_email(client: TestClient) -> None:
     response = client.get("/api/v1/mail-health")
     assert response.status_code == 422
+
+
+def test_mail_health_both_email_and_domain_rejected(client: TestClient) -> None:
+    response = client.get(
+        "/api/v1/mail-health",
+        params={"email": "me@example.com", "domain": "example.com"},
+    )
+    assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Input validation — email param
+# ---------------------------------------------------------------------------
 
 
 def test_mail_health_invalid_not_an_email(client: TestClient) -> None:
@@ -45,6 +64,106 @@ def test_mail_health_invalid_no_domain_dot(client: TestClient) -> None:
 def test_mail_health_invalid_a_at(client: TestClient) -> None:
     response = client.get("/api/v1/mail-health", params={"email": "a@"})
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Input validation — domain param
+# ---------------------------------------------------------------------------
+
+
+def test_mail_health_domain_invalid_empty(client: TestClient) -> None:
+    response = client.get("/api/v1/mail-health", params={"domain": ""})
+    assert response.status_code == 422
+
+
+def test_mail_health_domain_invalid_no_dot(client: TestClient) -> None:
+    response = client.get("/api/v1/mail-health", params={"domain": "nodot"})
+    assert response.status_code == 422
+
+
+def test_mail_health_domain_invalid_contains_at(client: TestClient) -> None:
+    response = client.get(
+        "/api/v1/mail-health", params={"domain": "me@aminbeigi.com"}
+    )
+    assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _validate_domain
+# ---------------------------------------------------------------------------
+
+
+def test_validate_domain_normalises_case() -> None:
+    assert _validate_domain("Example.COM") == "example.com"
+
+
+def test_validate_domain_strips_whitespace() -> None:
+    assert _validate_domain("  example.com  ") == "example.com"
+
+
+def test_validate_domain_rejects_empty() -> None:
+    with pytest.raises(ValueError):
+        _validate_domain("")
+
+
+def test_validate_domain_rejects_no_dot() -> None:
+    with pytest.raises(ValueError):
+        _validate_domain("nodot")
+
+
+def test_validate_domain_rejects_at_sign() -> None:
+    with pytest.raises(ValueError):
+        _validate_domain("me@example.com")
+
+
+def test_mail_health_domain_param_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "mailpulse.services.mail_health._resolve_mx",
+        lambda domain: [],
+    )
+    client = TestClient(create_app())
+    response = client.get("/api/v1/mail-health", params={"domain": "aminbeigi.com"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["domain"] == "aminbeigi.com"
+    assert data["status"] == "unhealthy"
+    assert check_by_name(data, "mx_records_found") == {
+        "name": "mx_records_found",
+        "passed": False,
+        "detail": "No MX records found",
+    }
+
+
+def test_mail_health_domain_param_all_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
+    far_future = datetime.now(tz=UTC) + timedelta(days=365)
+    monkeypatch.setattr(
+        "mailpulse.services.mail_health._resolve_mx",
+        lambda domain: [(10, "mx1.example.com"), (20, "mx2.example.com")],
+    )
+    monkeypatch.setattr(
+        "mailpulse.services.mail_health._resolve_ip_for_mx_host",
+        lambda host: "10.0.0.1",
+    )
+    monkeypatch.setattr(
+        "mailpulse.services.mail_health._resolve_cname",
+        lambda host: None,
+    )
+    monkeypatch.setattr(
+        "mailpulse.services.mail_health._resolve_txt",
+        lambda name: ["v=spf1 include:example.com ~all"]
+        if not name.startswith("_dmarc")
+        else ["v=DMARC1; p=none"],
+    )
+    monkeypatch.setattr(
+        "mailpulse.services.mail_health._resolve_domain_expiry",
+        lambda domain: far_future,
+    )
+    client = TestClient(create_app())
+    response = client.get("/api/v1/mail-health", params={"domain": "aminbeigi.com"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["domain"] == "aminbeigi.com"
+    assert data["status"] == "healthy"
 
 
 def test_mail_health_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:

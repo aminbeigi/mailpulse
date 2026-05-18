@@ -72,7 +72,7 @@ When running locally, the API exposes the same routes as production (base URL `h
 | Endpoint                   | Description                                 |
 | -------------------------- | ------------------------------------------- |
 | `GET /api/v1/health`       | Health check                                |
-| `GET /api/v1/mail-health`  | Suite of DNS- and WHOIS-based receiving-side health checks for an email’s domain (MX presence, null-MX, RFC 5321 MX target validity, MX resolution, multiple-MX resilience, SPF, DMARC, domain-expiry) |
+| `GET /api/v1/mail-health`  | Suite of DNS- and WHOIS-based receiving-side health checks. Accepts either `?email=you@example.com` or `?domain=example.com` (mutually exclusive). |
 | `GET /api/v1/docs`         | Swagger UI                                  |
 | `GET /api/v1/openapi.json` | OpenAPI schema                              |
 
