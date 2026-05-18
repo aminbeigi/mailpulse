@@ -155,12 +155,14 @@ mailpulse/
 │       ├── health.py  # GET /api/v1/health
 │       └── mail_health.py  # GET /api/v1/mail-health
 ├── core/
-│   └── config.py      # Settings via pydantic-settings
+│   ├── config.py      # Settings via pydantic-settings
+│   └── domains.py     # Email/domain input validation
 ├── schemas/           # Pydantic request/response models
 │   └── mail_health.py
 └── services/          # Business logic
     └── mail_health.py
 tests/
+├── test_domains.py    # Domain/email input validation
 ├── test_health.py     # Example API test (GET /api/v1/health)
 └── test_mail_health.py  # GET /api/v1/mail-health
 ```
