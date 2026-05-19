@@ -122,25 +122,23 @@ uv run pre-commit run --all-files
 
 ### CI/CD
 
-GitHub Actions runs `[.github/workflows/pipeline.yml](.github/workflows/pipeline.yml)` on every push and pull request to `main`.
+GitHub Actions keeps CI and deployment separate.
 
-**Pull requests and non-`main` pushes**
+**CI (`.github/workflows/ci.yml`)**
 
-1. Lint (Ruff).
-2. Run tests (pytest).
-3. Verify the Docker image builds.
-
-Nothing is published or deployed.
-
-**Push to `main`**
+Runs on every pull request and push to `main`:
 
 1. Lint (Ruff).
 2. Run tests (pytest).
 3. Verify the Docker image builds.
-4. **Build and push** the image to Amazon ECR (tagged with the commit SHA and `latest`).
-5. **Deploy to ECS** — download the current task definition, update only the container image to the new ECR tag, register a new task definition revision, and roll out that revision to the ECS service.
 
-Repository secrets in GitHub (AWS credentials, ECR registry/repo, ECS cluster/service, task definition family, container name) supply the deploy configuration.
+Nothing is published or deployed during CI.
+
+**Deployment (`.github/workflows/deploy.yml`)**
+
+Deployment is manually triggered from the GitHub Actions tab. It builds the current commit, pushes the image to Amazon ECR with the commit SHA tag, updates the ECS task definition to use that image, and rolls out the new revision to the ECS service.
+
+AWS credentials and ECR/ECS deployment configuration are supplied through GitHub repository secrets.
 
 ## Project structure
 
