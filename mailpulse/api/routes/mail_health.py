@@ -7,11 +7,30 @@ exclusive) and delegates to :func:`~mailpulse.services.mail_health.check_mail_he
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 
-from mailpulse.core.domains import parse_domain_from_email, validate_domain
+from mailpulse.core.helper import resolve_domain_input
 from mailpulse.schemas.mail_health import MailHealthResponse
 from mailpulse.services.mail_health import check_mail_health
 
 router = APIRouter(tags=["mail-health"])
+
+
+def _get_domain(email: str | None, domain: str | None) -> str:
+    """Resolve query inputs to a normalised domain or raise HTTP 422.
+
+    Args:
+        email: Email address whose domain should be extracted.
+        domain: Bare domain name to validate and normalise.
+
+    Returns:
+        Lowercased, normalised domain string.
+
+    Raises:
+        HTTPException: 422 if the inputs fail :func:`~mailpulse.core.domains.resolve_domain_input`.
+    """
+    try:
+        return resolve_domain_input(email=email, domain=domain)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get("/mail-health", response_model=MailHealthResponse)
@@ -37,21 +56,5 @@ async def get_mail_health(
         HTTPException: 422 if both or neither parameters are provided, or
             if the supplied value fails validation.
     """
-    if email is not None and domain is not None:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide either 'email' or 'domain', not both.",
-        )
-    if email is None and domain is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Provide either 'email' or 'domain'.",
-        )
-    try:
-        if email is not None:
-            resolved_domain = parse_domain_from_email(email)
-        else:
-            resolved_domain = validate_domain(domain)  # type: ignore[arg-type]
-        return await run_in_threadpool(check_mail_health, resolved_domain)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    resolved_domain = _get_domain(email=email, domain=domain)
+    return await run_in_threadpool(check_mail_health, resolved_domain)

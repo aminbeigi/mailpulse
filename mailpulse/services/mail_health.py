@@ -265,9 +265,8 @@ def check_mail_health(domain: str) -> MailHealthResponse:
 
     Args:
         domain: Validated, lowercased domain name to evaluate (e.g.
-            ``example.com``). Use :func:`~mailpulse.core.domains.parse_domain_from_email`
-            or :func:`~mailpulse.core.domains.validate_domain` to obtain this
-            value from caller input.
+            ``example.com``). Use :func:`~mailpulse.core.helper.resolve_domain_input`
+            to obtain this value from caller input.
 
     Returns:
         A :class:`~mailpulse.schemas.mail_health.MailHealthResponse` with
