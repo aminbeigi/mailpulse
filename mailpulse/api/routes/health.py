@@ -5,14 +5,36 @@ Exposes GET ``/api/v1/health`` with a minimal JSON payload.
 
 from fastapi import APIRouter
 
-router = APIRouter(tags=["health"])
+from mailpulse.schemas.health import HealthResponse
+
+router = APIRouter(tags=["Health"])
 
 
-@router.get("/health")
-async def health_check() -> dict[str, str]:
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Check API liveness",
+    description=(
+        "Return a minimal liveness response for load balancers, uptime monitors, "
+        "container orchestrators, and smoke tests. This endpoint does not perform "
+        "DNS, WHOIS, or downstream mail-health checks."
+    ),
+    response_description="The API process is running.",
+    responses={
+        200: {
+            "description": "MailPulse is running and able to serve HTTP requests.",
+            "content": {
+                "application/json": {
+                    "example": {"status": "ok"},
+                },
+            },
+        },
+    },
+)
+async def health_check() -> HealthResponse:
     """Report that the API process is running.
 
     Returns:
-        A mapping with ``status`` set to ``ok``.
+        A health response with ``status`` set to ``ok``.
     """
-    return {"status": "ok"}
+    return HealthResponse(status="ok")
