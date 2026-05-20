@@ -2,55 +2,65 @@
 
 import pytest
 
-from mailpulse.core.domains import parse_domain_from_email, validate_domain
+from mailpulse.core.helper import resolve_domain_input
 
 
-def test_validate_domain_normalises_case() -> None:
-    assert validate_domain("Example.COM") == "example.com"
+def test_resolve_domain_input_email_extracts_domain() -> None:
+    assert resolve_domain_input(email="me@Example.COM", domain=None) == "example.com"
 
 
-def test_validate_domain_strips_whitespace() -> None:
-    assert validate_domain("  example.com  ") == "example.com"
+def test_resolve_domain_input_email_strips_whitespace() -> None:
+    assert resolve_domain_input(email="  me@example.com  ", domain=None) == "example.com"
 
 
-def test_validate_domain_rejects_empty() -> None:
+def test_resolve_domain_input_domain_normalises_case() -> None:
+    assert resolve_domain_input(email=None, domain="Example.COM") == "example.com"
+
+
+def test_resolve_domain_input_domain_strips_whitespace() -> None:
+    assert resolve_domain_input(email=None, domain="  example.com  ") == "example.com"
+
+
+def test_resolve_domain_input_rejects_both() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        resolve_domain_input(email="me@example.com", domain="example.com")
+
+
+def test_resolve_domain_input_rejects_neither() -> None:
     with pytest.raises(ValueError):
-        validate_domain("")
+        resolve_domain_input(email=None, domain=None)
 
 
-def test_validate_domain_rejects_no_dot() -> None:
+def test_resolve_domain_input_rejects_invalid_email_no_at() -> None:
     with pytest.raises(ValueError):
-        validate_domain("nodot")
+        resolve_domain_input(email="not-an-email", domain=None)
 
 
-def test_validate_domain_rejects_at_sign() -> None:
+def test_resolve_domain_input_rejects_invalid_email_empty_local() -> None:
     with pytest.raises(ValueError):
-        validate_domain("me@example.com")
+        resolve_domain_input(email="@example.com", domain=None)
 
 
-def test_parse_domain_from_email_extracts_domain() -> None:
-    assert parse_domain_from_email("me@Example.COM") == "example.com"
-
-
-def test_parse_domain_from_email_strips_whitespace() -> None:
-    assert parse_domain_from_email("  me@example.com  ") == "example.com"
-
-
-def test_parse_domain_from_email_rejects_no_at() -> None:
+def test_resolve_domain_input_rejects_invalid_email_empty_domain() -> None:
     with pytest.raises(ValueError):
-        parse_domain_from_email("not-an-email")
+        resolve_domain_input(email="a@", domain=None)
 
 
-def test_parse_domain_from_email_rejects_empty_local() -> None:
+def test_resolve_domain_input_rejects_invalid_email_domain_without_dot() -> None:
     with pytest.raises(ValueError):
-        parse_domain_from_email("@example.com")
+        resolve_domain_input(email="a@b", domain=None)
 
 
-def test_parse_domain_from_email_rejects_empty_domain() -> None:
+def test_resolve_domain_input_rejects_empty_domain() -> None:
     with pytest.raises(ValueError):
-        parse_domain_from_email("a@")
+        resolve_domain_input(email=None, domain="")
 
 
-def test_parse_domain_from_email_rejects_domain_without_dot() -> None:
+def test_resolve_domain_input_rejects_domain_without_dot() -> None:
     with pytest.raises(ValueError):
-        parse_domain_from_email("a@b")
+        resolve_domain_input(email=None, domain="nodot")
+
+
+def test_resolve_domain_input_rejects_domain_with_at_sign() -> None:
+    with pytest.raises(ValueError):
+        resolve_domain_input(email=None, domain="me@example.com")
