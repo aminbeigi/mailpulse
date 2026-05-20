@@ -23,9 +23,9 @@ from mailpulse.schemas.mail_health import (
     MailHealthResponse,
 )
 
-DNS_TIMEOUT_SECONDS = 5
-WHOIS_TIMEOUT_SECONDS = 5
-DOMAIN_EXPIRY_WARN_DAYS = 30
+_DNS_TIMEOUT_SECONDS = 5
+_WHOIS_TIMEOUT_SECONDS = 5
+_DOMAIN_EXPIRY_WARN_DAYS = 30
 
 
 def _normalize_mx_exchange(exchange: str) -> str:
@@ -57,8 +57,8 @@ def _resolve_mx(domain: str) -> list[tuple[int, str]]:
         exist.
     """
     resolver = dns.resolver.Resolver()
-    resolver.timeout = DNS_TIMEOUT_SECONDS
-    resolver.lifetime = DNS_TIMEOUT_SECONDS
+    resolver.timeout = _DNS_TIMEOUT_SECONDS
+    resolver.lifetime = _DNS_TIMEOUT_SECONDS
     try:
         answers = resolver.resolve(domain, "MX")
     except (
@@ -91,8 +91,8 @@ def _resolve_ip_for_mx_host(host: str) -> str | None:
         resolution fails or yields no addresses.
     """
     resolver = dns.resolver.Resolver()
-    resolver.timeout = DNS_TIMEOUT_SECONDS
-    resolver.lifetime = DNS_TIMEOUT_SECONDS
+    resolver.timeout = _DNS_TIMEOUT_SECONDS
+    resolver.lifetime = _DNS_TIMEOUT_SECONDS
     for rtype in ("A", "AAAA"):
         try:
             answers = resolver.resolve(host, rtype)
@@ -156,8 +156,8 @@ def _resolve_txt(name: str) -> list[str]:
         DNS failure.
     """
     resolver = dns.resolver.Resolver()
-    resolver.timeout = DNS_TIMEOUT_SECONDS
-    resolver.lifetime = DNS_TIMEOUT_SECONDS
+    resolver.timeout = _DNS_TIMEOUT_SECONDS
+    resolver.lifetime = _DNS_TIMEOUT_SECONDS
     try:
         answers = resolver.resolve(name, "TXT")
     except (
@@ -189,8 +189,8 @@ def _resolve_cname(host: str) -> str | None:
         CNAME exists or the lookup fails.
     """
     resolver = dns.resolver.Resolver()
-    resolver.timeout = DNS_TIMEOUT_SECONDS
-    resolver.lifetime = DNS_TIMEOUT_SECONDS
+    resolver.timeout = _DNS_TIMEOUT_SECONDS
+    resolver.lifetime = _DNS_TIMEOUT_SECONDS
     try:
         answers = resolver.resolve(host, "CNAME")
     except (
@@ -260,7 +260,7 @@ def check_mail_health(domain: str) -> MailHealthResponse:
     - ``dmarc_record_present`` — A ``v=DMARC1`` TXT record exists at
       ``_dmarc.<domain>``.
     - ``domain_not_expiring_soon`` — Domain expiry is not within
-      :data:`DOMAIN_EXPIRY_WARN_DAYS` days (omitted when WHOIS is
+      :data:`_DOMAIN_EXPIRY_WARN_DAYS` days (omitted when WHOIS is
       unavailable).
 
     Args:
@@ -422,7 +422,7 @@ def check_mail_health(domain: str) -> MailHealthResponse:
                     detail=f"Domain registration expired on {expiry_str}.",
                 )
             )
-        elif days_remaining <= DOMAIN_EXPIRY_WARN_DAYS:
+        elif days_remaining <= _DOMAIN_EXPIRY_WARN_DAYS:
             checks.append(
                 MailHealthCheck(
                     name="domain_not_expiring_soon",
