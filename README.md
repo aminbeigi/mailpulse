@@ -12,7 +12,7 @@
 </p>
 
 
-# Description
+## Description
 
 MailPulse is a REST API that checks whether a mail server and domain are set up so incoming mail can be delivered.
 
