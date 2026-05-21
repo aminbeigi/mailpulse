@@ -10,20 +10,6 @@ from mailpulse.core.config import get_settings
 
 _API_DESCRIPTION = "Check whether email domains are configured to receive inbound mail."
 
-_OPENAPI_TAGS = [
-    {
-        "name": "Health",
-        "description": "Lightweight service liveness checks for load balancers and monitors.",
-    },
-    {
-        "name": "Mail Health",
-        "description": (
-            "DNS and WHOIS based checks that assess whether a domain can likely "
-            "receive inbound email."
-        ),
-    },
-]
-
 
 def create_app() -> FastAPI:
     """Build and configure the MailPulse FastAPI application.
@@ -40,7 +26,6 @@ def create_app() -> FastAPI:
         docs_url="/api/v1/docs",
         openapi_url="/api/v1/openapi.json",
         redoc_url=None,
-        openapi_tags=_OPENAPI_TAGS,
         contact={
             "name": "Amin Beigi",
             "url": "https://aminbeigi.com",

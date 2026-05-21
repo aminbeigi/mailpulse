@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from mailpulse.app import create_app
+from mailpulse.services.mail_health_catalog import CHECK_CATALOG, make_check
 
 
 @pytest.fixture
@@ -20,6 +21,43 @@ def check_by_name(data: dict, name: str) -> dict | None:
         if check["name"] == name:
             return check
     return None
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for the catalog
+# ---------------------------------------------------------------------------
+
+
+def test_make_check_populates_catalog_fields() -> None:
+    check = make_check("mx_records_found", passed=True, result="2 MX record(s): 10 mx1.example.com")
+    assert check.name == "mx_records_found"
+    assert check.title == "MX records present"
+    assert check.severity == "critical"
+    assert check.reference == "RFC 5321"
+    assert check.passed is True
+    assert check.result == "2 MX record(s): 10 mx1.example.com"
+
+
+def test_make_check_warning_fields() -> None:
+    check = make_check("spf_record_present", passed=False, result="No v=spf1 TXT record at apex")
+    assert check.severity == "warning"
+    assert check.reference == "RFC 7208"
+    assert check.passed is False
+
+
+def test_catalog_has_all_nine_checks() -> None:
+    expected = {
+        "mx_records_found",
+        "not_null_mx",
+        "mx_not_ip_literal",
+        "mx_not_cname",
+        "mx_resolves",
+        "multiple_mx_records",
+        "spf_record_present",
+        "dmarc_record_present",
+        "domain_not_expiring_soon",
+    }
+    assert set(CHECK_CATALOG.keys()) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -96,11 +134,12 @@ def test_mail_health_domain_param_no_mx_records(monkeypatch: pytest.MonkeyPatch)
     data = response.json()
     assert data["domain"] == "aminbeigi.com"
     assert data["status"] == "unhealthy"
-    assert check_by_name(data, "mx_records_found") == {
-        "name": "mx_records_found",
-        "passed": False,
-        "detail": "No MX records found",
-    }
+    mx_check = check_by_name(data, "mx_records_found")
+    assert mx_check["passed"] is False
+    assert mx_check["result"] == "No MX records found"
+    assert mx_check["severity"] == "critical"
+    assert mx_check["title"] == "MX records present"
+    assert mx_check["reference"] == "RFC 5321"
 
 
 def test_mail_health_domain_param_all_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,11 +187,9 @@ def test_mail_health_no_mx_records(monkeypatch: pytest.MonkeyPatch) -> None:
     data = response.json()
     assert data["domain"] == "aminbeigi.com"
     assert data["status"] == "unhealthy"
-    assert check_by_name(data, "mx_records_found") == {
-        "name": "mx_records_found",
-        "passed": False,
-        "detail": "No MX records found",
-    }
+    mx_check = check_by_name(data, "mx_records_found")
+    assert mx_check["passed"] is False
+    assert mx_check["result"] == "No MX records found"
     assert check_by_name(data, "mx_resolves") is None
 
 
@@ -177,7 +214,7 @@ def test_mail_health_null_mx(monkeypatch: pytest.MonkeyPatch) -> None:
     assert check_by_name(data, "mx_records_found")["passed"] is True
     not_null = check_by_name(data, "not_null_mx")
     assert not_null["passed"] is False
-    assert "RFC 7505" in not_null["detail"]
+    assert "RFC 7505" in not_null["result"]
     assert check_by_name(data, "mx_not_ip_literal") is None
     assert check_by_name(data, "mx_not_cname") is None
     assert check_by_name(data, "mx_resolves") is None
@@ -208,7 +245,7 @@ def test_mail_health_mx_is_ip_literal(monkeypatch: pytest.MonkeyPatch) -> None:
     assert data["status"] == "unhealthy"
     ip_check = check_by_name(data, "mx_not_ip_literal")
     assert ip_check["passed"] is False
-    assert "RFC 5321" in ip_check["detail"]
+    assert "RFC 5321" in ip_check["result"]
     assert check_by_name(data, "mx_not_cname") is None
 
 
@@ -236,8 +273,8 @@ def test_mail_health_mx_is_cname(monkeypatch: pytest.MonkeyPatch) -> None:
     assert data["status"] == "unhealthy"
     cname_check = check_by_name(data, "mx_not_cname")
     assert cname_check["passed"] is False
-    assert "RFC 5321" in cname_check["detail"]
-    assert "target.example.net" in cname_check["detail"]
+    assert "RFC 5321" in cname_check["result"]
+    assert "target.example.net" in cname_check["result"]
 
 
 def test_mail_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -268,7 +305,7 @@ def test_mail_health_mx_does_not_resolve(monkeypatch: pytest.MonkeyPatch) -> Non
     assert data["status"] == "unhealthy"
     mx_resolves = check_by_name(data, "mx_resolves")
     assert mx_resolves["passed"] is False
-    assert "did not resolve" in mx_resolves["detail"]
+    assert "did not resolve" in mx_resolves["result"]
 
 
 def test_mail_health_single_mx(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -300,10 +337,11 @@ def test_mail_health_single_mx(monkeypatch: pytest.MonkeyPatch) -> None:
     response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "unhealthy"
+    assert data["status"] == "healthy"
     multi_mx = check_by_name(data, "multiple_mx_records")
     assert multi_mx["passed"] is False
-    assert "no failover" in multi_mx["detail"]
+    assert multi_mx["severity"] == "warning"
+    assert "no DNS failover" in multi_mx["result"]
 
 
 def test_mail_health_missing_spf(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -331,10 +369,11 @@ def test_mail_health_missing_spf(monkeypatch: pytest.MonkeyPatch) -> None:
     response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "unhealthy"
+    assert data["status"] == "healthy"
     spf = check_by_name(data, "spf_record_present")
     assert spf["passed"] is False
-    assert "v=spf1" in spf["detail"]
+    assert spf["severity"] == "warning"
+    assert "v=spf1" in spf["result"]
 
 
 def test_mail_health_missing_dmarc(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -362,10 +401,11 @@ def test_mail_health_missing_dmarc(monkeypatch: pytest.MonkeyPatch) -> None:
     response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "unhealthy"
+    assert data["status"] == "healthy"
     dmarc = check_by_name(data, "dmarc_record_present")
     assert dmarc["passed"] is False
-    assert "_dmarc" in dmarc["detail"]
+    assert dmarc["severity"] == "warning"
+    assert "_dmarc" in dmarc["result"]
 
 
 def test_mail_health_domain_expiring_soon(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -398,10 +438,11 @@ def test_mail_health_domain_expiring_soon(monkeypatch: pytest.MonkeyPatch) -> No
     response = client.get("/api/v1/mail-health", params={"email": "me@aminbeigi.com"})
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "unhealthy"
+    assert data["status"] == "healthy"
     expiry_check = check_by_name(data, "domain_not_expiring_soon")
     assert expiry_check["passed"] is False
-    assert "days" in expiry_check["detail"]
+    assert expiry_check["severity"] == "warning"
+    assert "days" in expiry_check["result"]
 
 
 def test_mail_health_domain_expiry_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -483,3 +524,6 @@ def test_mail_health_all_healthy(monkeypatch: pytest.MonkeyPatch) -> None:
     assert actual_checks == expected_checks
     for check in data["checks"]:
         assert check["passed"] is True, f"Expected {check['name']} to pass"
+        assert "title" in check
+        assert "severity" in check
+        assert "description" in check

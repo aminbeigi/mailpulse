@@ -60,6 +60,18 @@ def normalize_record(data: dict[str, str]) -> Record:
     """
 ```
 
+# Module-private constants
+
+Prefix module-level constants with a single leading underscore when they are used only within that file (not imported or re-exported elsewhere). Public names are reserved for values that are part of the module’s external API.
+
+```python
+# good — file-local tuning knobs
+_DNS_TIMEOUT_SECONDS = 5
+
+# good — shared or documented API surface
+DEFAULT_PAGE_SIZE = 50
+```
+
 # Control flow
 
 Avoid one-line if/else forms (including ternary expressions). Use a normal `if` / `else` block so branches stay easy to read and step through.
