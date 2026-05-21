@@ -1,6 +1,6 @@
 # MailPulse
 
-MailPulse is a backend tool that checks whether a mail server and domain are set up so incoming mail can be delivered.
+MailPulse is a REST API that checks whether a mail server and domain are set up so incoming mail can be delivered.
 
 It came out of a real incident: my mail server failed without me noticing. For several days, messages to my domain were not delivered, and I missed important email. MailPulse is meant to surface that kind of failure early, before silent delivery loss drags on.
 
@@ -21,7 +21,7 @@ The goal is for this API to become a small suite of automation-friendly tools fo
 
 ## Mail Health
 
-`GET /api/v1/mail-health` runs nine DNS and WHOIS checks against a domain. Each check has a `severity` of `critical` or `warning`. The top-level `status` is `healthy` only when every emitted **critical** check passes; warning failures are included in the response but do not change the verdict.
+`GET /api/v1/mail-health` runs DNS and WHOIS checks against a domain. Each check has a `severity` of `critical` or `warning`. The top-level `status` is `healthy` only when every emitted **critical** check passes; warning failures are included in the response but do not change the verdict.
 
 | Severity | Checks |
 | -------- | ------ |
@@ -95,9 +95,9 @@ Clone the repo and work on MailPulse locally: install dependencies, run the API,
 ### Requirements
 
 - Python 3.12+
-- [Git](https://git-scm.com/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/)
-- [Docker](https://docs.docker.com/get-docker/)
+- uv
+- Git
+- Docker
 
 ### Setup
 
@@ -110,6 +110,9 @@ uv sync --group dev
 
 # Copy the example env file and adjust as needed.
 cp .env.example .env
+
+# Install pre-commit hooks. Run once after cloning.
+uv run pre-commit install
 ```
 
 ### Run
@@ -128,6 +131,7 @@ Build and run the API in a container. The image sets `MAILPULSE_HOST=0.0.0.0` so
 docker build -t mailpulse:latest .
 docker run --rm -d --name mailpulse -p 8000:8000 mailpulse:latest
 curl http://127.0.0.1:8000/api/v1/health
+docker stop mailpulse
 ```
 
 ### Configuration
@@ -146,7 +150,7 @@ All settings are read from environment variables, or from a `.env` file, with th
 
 ### Tests
 
-Automated tests live in the top-level `tests/` directory. They use [pytest](https://docs.pytest.org/) with FastAPI's test client via [httpx](https://www.python-httpx.org/).
+Automated tests live in the top-level `tests/` directory. They use pytest with FastAPI's test client via httpx.
 
 Run the full suite:
 
@@ -172,16 +176,6 @@ uv run ruff check --fix mailpulse
 
 # Format code.
 uv run ruff format mailpulse
-```
-
-### Pre-Commit
-
-```bash
-# Install hooks. Run once after cloning.
-uv run pre-commit install
-
-# Run hooks manually against all files.
-uv run pre-commit run --all-files
 ```
 
 ## CI/CD
@@ -237,5 +231,5 @@ Amin Beigi.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License.  
 See [LICENSE](LICENSE) for the full text.
