@@ -1,4 +1,18 @@
-# MailPulse
+<p align="center">
+  <img src="assets/logo.png" height="200px" width="200px"/>
+  <br/>
+  <h3 align="center">MailPulse</h3>
+</p>
+<br />
+
+<p align="center">
+  <a href="../../issues"><img src="https://img.shields.io/github/issues/aminbeigi/mailpulse.svg?style=flat-square" /></a>
+  <a href="../../pulls"><img src="https://img.shields.io/github/issues-pr/aminbeigi/mailpulse.svg?style=flat-square" /></a>
+  <img src="https://img.shields.io/github/license/aminbeigi/mailpulse?style=flat-square">
+</p>
+
+
+# Description
 
 MailPulse is a REST API that checks whether a mail server and domain are set up so incoming mail can be delivered.
 
@@ -8,149 +22,68 @@ The goal is for this API to become a small suite of automation-friendly tools fo
 
 **Live API**: [https://mailpulse.aminbeigi.com/api/v1/docs](https://mailpulse.aminbeigi.com/api/v1/docs)
 
-## API
+## Getting Started
 
+These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See [Deployment](#deployment) for notes on how to deploy the project on a live system.
 
-| Endpoint                   | Description                           |
-| -------------------------- | ------------------------------------- |
-| `GET /api/v1/health`       | Health check.                         |
-| `GET /api/v1/mail-health`  | Mail server and domain health checks. |
-| `GET /api/v1/docs`         | Swagger UI.                           |
-| `GET /api/v1/openapi.json` | OpenAPI schema.                       |
+### Prerequisites
 
+- [Git](https://git-scm.com/downloads) — clones the repository
+- [Docker](https://docs.docker.com/get-docker/) — builds and runs the API
+- [uv](https://docs.astral.sh/uv/) — installs dependencies for tests and lint
 
-## Mail Health
+### Installation
 
-`GET /api/v1/mail-health` runs DNS and WHOIS checks against a domain. Each check has a `severity` of `critical` or `warning`. The top-level `status` is `healthy` only when every emitted **critical** check passes; warning failures are included in the response but do not change the verdict.
-
-| Severity | Checks |
-| -------- | ------ |
-| `critical` | MX records present, not a null MX, MX target is a hostname, MX target is not a CNAME, top MX resolves |
-| `warning` | Multiple MX records, SPF record at apex, DMARC record published, domain registration not expiring soon |
-
-The WHOIS expiry check (`domain_not_expiring_soon`) is omitted from the response when WHOIS data is unavailable for a TLD.
-
-Example response:
-
-```json
-{
-  "domain": "example.com",
-  "status": "healthy",
-  "checks": [
-    {
-      "name": "mx_records_found",
-      "title": "MX records present",
-      "description": "Confirms the domain publishes at least one DNS MX record...",
-      "reference": "RFC 5321",
-      "severity": "critical",
-      "passed": true,
-      "result": "2 MX record(s): 10 mx1.example.com, 20 mx2.example.com"
-    },
-    {
-      "name": "spf_record_present",
-      "title": "SPF record at apex",
-      "description": "Checks for a TXT record at the domain apex beginning with v=spf1...",
-      "reference": "RFC 7208",
-      "severity": "warning",
-      "passed": false,
-      "result": "No v=spf1 TXT record at apex"
-    }
-  ]
-}
-```
-
-A `"status": "healthy"` result with a failed warning check (like the SPF example above) means all critical delivery infrastructure is in place, but the recommended authentication record is missing.
-
-## Architecture
-
-MailPulse is stateless: the API keeps no server-side sessions, in-memory user state, or local database. Each request is handled on its own, so any healthy ECS task behind the load balancer can serve any call.
-
-At a high level, the client asks DNS for `mailpulse.aminbeigi.com`, DNS returns the load balancer address, the client connects to the load balancer, and the load balancer forwards the request to the MailPulse container.
-
-```mermaid
-flowchart LR
-  client["Client"]
-  dns["Public DNS"]
-  alb["AWS Load Balancer"]
-  ecs["MailPulse ECS Container"]
-
-  client -->|DNS lookup| dns
-  dns -->|Load balancer address| client
-  client -->|HTTPS request| alb
-  alb -->|Forwards request| ecs
-```
-
-### SMTP Limitation
-
-The production API runs in an AWS ECS container. AWS blocks outbound TCP connections to port 25 from that container, so MailPulse cannot connect to remote SMTP servers, open SMTP handshakes, or verify live SMTP reachability in production.
-
-`GET /api/v1/mail-health` therefore reports DNS and WHOIS based health only. A `"healthy"` result means the domain is configured plausibly for inbound mail, not that a live SMTP server is accepting mail.
-
-
-
-## Local Development
-
-Clone the repo and work on MailPulse locally: install dependencies, run the API, test, and lint.
-
-### Requirements
-
-- Python 3.12+
-- uv
-- Git
-- Docker
-
-### Setup
+**1. Clone the repository**
 
 ```bash
 git clone https://github.com/aminbeigi/mailpulse.git
 cd mailpulse
+```
 
-# Install dependencies, including dev tools, into a managed .venv.
+**2. Install dependencies**
+
+```bash
 uv sync --group dev
+```
 
-# Copy the example env file and adjust as needed.
+**3. Configure environment**
+
+```bash
 cp .env.example .env
+```
 
-# Install pre-commit hooks. Run once after cloning.
+**4. Install Git hooks**
+
+```bash
 uv run pre-commit install
 ```
 
-### Run
-
-```bash
-uv run python -m mailpulse
-```
-
-The server starts at `http://127.0.0.1:8000` by default. Local development exposes the same routes as production.
-
-### Docker
-
-Build and run the API in a container. The image sets `MAILPULSE_HOST=0.0.0.0` so the server accepts connections from outside the container.
+**5. Build the image**
 
 ```bash
 docker build -t mailpulse:latest .
+```
+
+**6. Run the API**
+
+```bash
 docker run --rm -d --name mailpulse -p 8000:8000 mailpulse:latest
-curl http://127.0.0.1:8000/api/v1/health
+```
+
+**7. Try it**
+
+```bash
+curl "http://127.0.0.1:8000/api/v1/mail-health?domain=example.com"
+```
+
+**8. Stop the container**
+
+```bash
 docker stop mailpulse
 ```
 
-### Configuration
-
-All settings are read from environment variables, or from a `.env` file, with the `MAILPULSE_` prefix.
-
-
-| Variable             | Default     | Description          |
-| -------------------- | ----------- | -------------------- |
-| `MAILPULSE_HOST`     | `127.0.0.1` | Bind host.           |
-| `MAILPULSE_PORT`     | `8000`      | Bind port.           |
-| `MAILPULSE_RELOAD`   | `false`     | Enable hot reload.   |
-| `MAILPULSE_APP_NAME` | `MailPulse` | Application name.    |
-| `MAILPULSE_VERSION`  | `1.0.0`     | Application version. |
-
-
-### Tests
-
-Automated tests live in the top-level `tests/` directory. They use pytest with FastAPI's test client via httpx.
+## Running the tests
 
 Run the full suite:
 
@@ -165,7 +98,7 @@ uv run pytest tests/test_health.py
 uv run pytest tests/test_health.py::test_health_returns_ok
 ```
 
-### Lint And Format
+## Lint And Format
 
 ```bash
 # Check for issues.
@@ -198,36 +131,43 @@ Deployment is manually triggered from the GitHub Actions tab by `.github/workflo
 
 AWS credentials and ECR/ECS deployment configuration are supplied through GitHub repository secrets.
 
-## Project Structure
+## API Specification
 
-```text
-mailpulse/
-|-- __init__.py              # Package version
-|-- __main__.py              # Entry point: python -m mailpulse
-|-- app.py                   # FastAPI app factory
-|-- api/
-|   |-- router.py            # Mounts routes under /api/v1
-|   `-- routes/
-|       |-- health.py        # GET /api/v1/health (load balancer liveness)
-|       `-- mail_health.py   # GET /api/v1/mail-health
-|-- core/
-|   |-- config.py            # Settings via pydantic-settings
-|   `-- helper.py            # Email/domain input validation
-|-- schemas/
-|   |-- health.py            # Liveness response model
-|   `-- mail_health.py       # Mail-health response models (checks, severity)
-`-- services/
-    |-- mail_health.py           # DNS/WHOIS probes and check orchestration
-    `-- mail_health_catalog.py   # Static check metadata and result templates
-tests/
-|-- test_domains.py        # resolve_domain_input validation
-|-- test_health.py         # GET /api/v1/health
-`-- test_mail_health.py    # GET /api/v1/mail-health
+| Endpoint                   | Description                           |
+| -------------------------- | ------------------------------------- |
+| `GET /api/v1/health`       | Health check                          |
+| `GET /api/v1/mail-health`  | Mail server and domain health checks  |
+| `GET /api/v1/docs`         | Swagger UI                            |
+| `GET /api/v1/openapi.json` | OpenAPI schema                        |
+
+## Architecture
+
+MailPulse is stateless: the API keeps no server-side sessions, in-memory user state, or local database. Each request is handled on its own, so any healthy ECS task behind the load balancer can serve any call.
+
+At a high level, the client asks DNS for `mailpulse.aminbeigi.com`, DNS returns the load balancer address, the client connects to the load balancer, and the load balancer forwards the request to the MailPulse container.
+
+```mermaid
+flowchart LR
+  client["Client"]
+  dns["Public DNS"]
+  alb["AWS Load Balancer"]
+  ecs["MailPulse ECS Container"]
+
+  client -->|DNS lookup| dns
+  dns -->|Load balancer address| client
+  client -->|HTTPS request| alb
+  alb -->|Forwards request| ecs
 ```
+
+### SMTP Limitation
+
+The production API runs in an AWS ECS container. AWS blocks outbound TCP connections to port 25 from that container, so MailPulse cannot connect to remote SMTP servers, open SMTP handshakes, or verify live SMTP reachability in production.
+
+`GET /api/v1/mail-health` therefore reports DNS and WHOIS based health only. A `"healthy"` result means the domain is configured plausibly for inbound mail, not that a live SMTP server is accepting mail.
 
 ## Author
 
-Amin Beigi.
+- Amin Beigi
 
 ## License
 
