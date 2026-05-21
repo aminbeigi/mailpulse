@@ -18,14 +18,17 @@ import dns.resolver
 import whois
 
 from mailpulse.schemas.mail_health import (
+    CheckSeverity,
     HealthStatus,
     MailHealthCheck,
     MailHealthResponse,
 )
+from mailpulse.services.mail_health_catalog import make_check
 
 _DNS_TIMEOUT_SECONDS = 5
 _WHOIS_TIMEOUT_SECONDS = 5
 _DOMAIN_EXPIRY_WARN_DAYS = 30
+_SPF_DMARC_TRUNCATE_CHARS = 120
 
 
 def _normalize_mx_exchange(exchange: str) -> str:
@@ -240,6 +243,80 @@ def _resolve_domain_expiry(domain: str) -> datetime | None:
         return None
 
 
+def _format_mx_list(rows: list[tuple[int, str]]) -> str:
+    """Format MX rows as a comma-separated preference/host string.
+
+    Args:
+        rows: Sorted list of ``(preference, host)`` tuples.
+
+    Returns:
+        A string like ``"10 mx1.example.com, 20 mx2.example.com"``.
+    """
+    return ", ".join(f"{pref} {host}" for pref, host in rows)
+
+
+def _truncate(text: str, limit: int = _SPF_DMARC_TRUNCATE_CHARS) -> str:
+    """Truncate *text* to *limit* characters, appending ``…`` if cut.
+
+    Args:
+        text: Input string.
+        limit: Maximum character count before truncation.
+
+    Returns:
+        The original string, or the first ``limit`` characters followed
+        by ``…`` when longer.
+    """
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "…"
+
+
+def _find_spf_record(records: list[str]) -> str | None:
+    """Return the first TXT record beginning with ``v=spf1`` (case-insensitive).
+
+    Args:
+        records: List of decoded TXT record strings.
+
+    Returns:
+        The matching record string, or ``None`` if none found.
+    """
+    for record in records:
+        if record.lower().startswith("v=spf1"):
+            return record
+    return None
+
+
+def _find_dmarc_record(records: list[str]) -> str | None:
+    """Return the first TXT record beginning with ``v=DMARC1`` (case-insensitive).
+
+    Args:
+        records: List of decoded TXT record strings.
+
+    Returns:
+        The matching record string, or ``None`` if none found.
+    """
+    for record in records:
+        if record.upper().startswith("V=DMARC1"):
+            return record
+    return None
+
+
+def _compute_status(checks: list[MailHealthCheck]) -> HealthStatus:
+    """Derive top-level status from critical checks only.
+
+    Args:
+        checks: All emitted checks for the run.
+
+    Returns:
+        ``HealthStatus.HEALTHY`` when every emitted critical check passed;
+        ``HealthStatus.UNHEALTHY`` otherwise.
+    """
+    critical = [c for c in checks if c.severity == CheckSeverity.CRITICAL]
+    if all(c.passed for c in critical):
+        return HealthStatus.HEALTHY
+    return HealthStatus.UNHEALTHY
+
+
 def check_mail_health(domain: str) -> MailHealthResponse:
     """Assess whether mail can likely be received for a domain.
 
@@ -263,6 +340,9 @@ def check_mail_health(domain: str) -> MailHealthResponse:
       :data:`_DOMAIN_EXPIRY_WARN_DAYS` days (omitted when WHOIS is
       unavailable).
 
+    Top-level ``status`` is ``healthy`` only when every emitted critical
+    check passes; warning failures do not affect it.
+
     Args:
         domain: Validated, lowercased domain name to evaluate (e.g.
             ``example.com``). Use :func:`~mailpulse.core.helper.resolve_domain_input`
@@ -278,10 +358,10 @@ def check_mail_health(domain: str) -> MailHealthResponse:
     mx_rows = _resolve_mx(domain)
     if not mx_rows:
         checks.append(
-            MailHealthCheck(
-                name="mx_records_found",
+            make_check(
+                "mx_records_found",
                 passed=False,
-                detail="No MX records found",
+                result="No MX records found",
             )
         )
         return MailHealthResponse(
@@ -290,14 +370,22 @@ def check_mail_health(domain: str) -> MailHealthResponse:
             checks=checks,
         )
 
-    checks.append(MailHealthCheck(name="mx_records_found", passed=True))
+    mx_list = _format_mx_list(mx_rows)
+    mx_count = len(mx_rows)
+    checks.append(
+        make_check(
+            "mx_records_found",
+            passed=True,
+            result=f"{mx_count} MX record(s): {mx_list}",
+        )
+    )
 
     if _is_null_mx(mx_rows):
         checks.append(
-            MailHealthCheck(
-                name="not_null_mx",
+            make_check(
+                "not_null_mx",
                 passed=False,
-                detail="Domain advertises a null MX (RFC 7505): explicitly refusing mail.",
+                result="Domain advertises a null MX (RFC 7505): explicitly refusing mail",
             )
         )
         return MailHealthResponse(
@@ -306,104 +394,132 @@ def check_mail_health(domain: str) -> MailHealthResponse:
             checks=checks,
         )
 
-    checks.append(MailHealthCheck(name="not_null_mx", passed=True))
+    preference, mx_host = mx_rows[0]
+    checks.append(
+        make_check(
+            "not_null_mx",
+            passed=True,
+            result=f"MX RRset is not null MX; top target: {preference} {mx_host}",
+        )
+    )
 
-    _preference, mx_host = mx_rows[0]
     critical_failed = False
 
     if _is_ip_literal(mx_host):
         checks.append(
-            MailHealthCheck(
-                name="mx_not_ip_literal",
+            make_check(
+                "mx_not_ip_literal",
                 passed=False,
-                detail=(
+                result=(
                     f"Top MX target is an IP literal ({mx_host}); "
-                    "RFC 5321 §5.1 forbids IP addresses in MX exchanges."
+                    "RFC 5321 §5.1 forbids IP addresses in MX exchanges"
                 ),
             )
         )
         critical_failed = True
     else:
-        checks.append(MailHealthCheck(name="mx_not_ip_literal", passed=True))
+        checks.append(
+            make_check(
+                "mx_not_ip_literal",
+                passed=True,
+                result=f"Top MX target {mx_host} is a hostname (not an IP literal)",
+            )
+        )
 
         cname_target = _resolve_cname(mx_host)
         if cname_target is not None:
             checks.append(
-                MailHealthCheck(
-                    name="mx_not_cname",
+                make_check(
+                    "mx_not_cname",
                     passed=False,
-                    detail=(
+                    result=(
                         f"Top MX target {mx_host} is a CNAME to {cname_target}; "
-                        "RFC 5321 §5.1 forbids CNAMEs as MX exchanges."
+                        "RFC 5321 §5.1 forbids CNAMEs as MX exchanges"
                     ),
                 )
             )
             critical_failed = True
         else:
-            checks.append(MailHealthCheck(name="mx_not_cname", passed=True))
+            checks.append(
+                make_check(
+                    "mx_not_cname",
+                    passed=True,
+                    result=f"Top MX target {mx_host} is not a CNAME",
+                )
+            )
 
-    if critical_failed:
-        status = HealthStatus.UNHEALTHY
-    else:
+    if not critical_failed:
         ip_address = _resolve_ip_for_mx_host(mx_host)
         if not ip_address:
             checks.append(
-                MailHealthCheck(
-                    name="mx_resolves",
+                make_check(
+                    "mx_resolves",
                     passed=False,
-                    detail="Highest-priority MX did not resolve",
+                    result=f"Highest-priority MX {mx_host} did not resolve to an A or AAAA record",
                 )
             )
             critical_failed = True
         else:
             checks.append(
-                MailHealthCheck(
-                    name="mx_resolves",
+                make_check(
+                    "mx_resolves",
                     passed=True,
-                    detail=f"{mx_host} resolved to {ip_address}",
+                    result=f"{mx_host} resolved to {ip_address}",
                 )
             )
 
-    if len(mx_rows) == 1:
+    if mx_count == 1:
         checks.append(
-            MailHealthCheck(
-                name="multiple_mx_records",
+            make_check(
+                "multiple_mx_records",
                 passed=False,
-                detail="Only one MX record; mail flow has no failover.",
+                result=f"Only one MX record ({preference} {mx_host}); no DNS failover",
             )
         )
     else:
         checks.append(
-            MailHealthCheck(
-                name="multiple_mx_records",
+            make_check(
+                "multiple_mx_records",
                 passed=True,
-                detail=f"{len(mx_rows)} MX records found",
+                result=f"{mx_count} MX records: {mx_list}",
             )
         )
 
     txt_records = _resolve_txt(domain)
-    spf_present = any(r.lower().startswith("v=spf1") for r in txt_records)
-    if spf_present:
-        checks.append(MailHealthCheck(name="spf_record_present", passed=True))
+    spf_record = _find_spf_record(txt_records)
+    if spf_record is not None:
+        checks.append(
+            make_check(
+                "spf_record_present",
+                passed=True,
+                result=f"SPF present: {_truncate(spf_record)}",
+            )
+        )
     else:
         checks.append(
-            MailHealthCheck(
-                name="spf_record_present",
+            make_check(
+                "spf_record_present",
                 passed=False,
-                detail=f"No SPF (v=spf1) TXT record at apex of {domain}.",
+                result="No v=spf1 TXT record at apex",
             )
         )
 
     dmarc_records = _resolve_txt(f"_dmarc.{domain}")
-    dmarc_present = any(r.upper().startswith("V=DMARC1") for r in dmarc_records)
-    if dmarc_present:
-        checks.append(MailHealthCheck(name="dmarc_record_present", passed=True))
+    dmarc_record = _find_dmarc_record(dmarc_records)
+    if dmarc_record is not None:
+        checks.append(
+            make_check(
+                "dmarc_record_present",
+                passed=True,
+                result=f"DMARC present: {_truncate(dmarc_record)}",
+            )
+        )
     else:
         checks.append(
-            MailHealthCheck(
-                name="dmarc_record_present",
+            make_check(
+                "dmarc_record_present",
                 passed=False,
-                detail=f"No DMARC TXT record at _dmarc.{domain}.",
+                result=f"No v=DMARC1 TXT record at _dmarc.{domain}",
             )
         )
 
@@ -416,37 +532,31 @@ def check_mail_health(domain: str) -> MailHealthResponse:
         expiry_str = expiry.strftime("%Y-%m-%d")
         if days_remaining < 0:
             checks.append(
-                MailHealthCheck(
-                    name="domain_not_expiring_soon",
+                make_check(
+                    "domain_not_expiring_soon",
                     passed=False,
-                    detail=f"Domain registration expired on {expiry_str}.",
+                    result=f"Domain registration expired on {expiry_str}",
                 )
             )
         elif days_remaining <= _DOMAIN_EXPIRY_WARN_DAYS:
             checks.append(
-                MailHealthCheck(
-                    name="domain_not_expiring_soon",
+                make_check(
+                    "domain_not_expiring_soon",
                     passed=False,
-                    detail=f"Domain expires in {days_remaining} days ({expiry_str}).",
+                    result=f"Domain expires in {days_remaining} days ({expiry_str})",
                 )
             )
         else:
             checks.append(
-                MailHealthCheck(
-                    name="domain_not_expiring_soon",
+                make_check(
+                    "domain_not_expiring_soon",
                     passed=True,
-                    detail=f"Domain expires on {expiry_str}.",
+                    result=f"Registration valid; expires {expiry_str} ({days_remaining} days remaining)",
                 )
             )
 
-    all_passed = all(c.passed for c in checks)
-    if all_passed:
-        status = HealthStatus.HEALTHY
-    else:
-        status = HealthStatus.UNHEALTHY
-
     return MailHealthResponse(
         domain=domain,
-        status=status,
+        status=_compute_status(checks),
         checks=checks,
     )

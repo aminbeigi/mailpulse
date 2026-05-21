@@ -3,4 +3,4 @@
 Package root; exposes :data:`__version__` for release identification.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

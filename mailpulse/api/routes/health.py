@@ -14,11 +14,7 @@ router = APIRouter(tags=["Health"])
     "/health",
     response_model=HealthResponse,
     summary="Check API liveness",
-    description=(
-        "Return a minimal liveness response for load balancers, uptime monitors, "
-        "container orchestrators, and smoke tests. This endpoint does not perform "
-        "DNS, WHOIS, or downstream mail-health checks."
-    ),
+    description="Minimal liveness response for load balancer health checks.",
     response_description="The API process is running.",
     responses={
         200: {

@@ -17,72 +17,121 @@ MAIL_HEALTH_EXAMPLE = {
     "checks": [
         {
             "name": "mx_records_found",
+            "title": "MX records present",
+            "description": (
+                "Confirms the domain publishes at least one DNS MX record so sending "
+                "mail systems know where to deliver inbound mail. Without MX records, "
+                "there is no standard inbound route and delivery cannot be attempted "
+                "for this domain."
+            ),
+            "reference": "RFC 5321",
+            "severity": "critical",
             "passed": True,
-            "detail": "MX records found: 10 mx1.example.com, 20 mx2.example.com",
+            "result": "2 MX record(s): 10 mx1.example.com, 20 mx2.example.com",
         },
         {
             "name": "not_null_mx",
+            "title": "Not a null MX",
+            "description": (
+                "Confirms the domain does not publish an RFC 7505 null MX "
+                "(preference 0 with an empty exchange). A null MX is an explicit "
+                "signal that the domain does not accept inbound mail."
+            ),
+            "reference": "RFC 7505",
+            "severity": "critical",
             "passed": True,
-            "detail": "Domain does not publish a null MX record",
+            "result": "MX RRset is not null MX; top target: 10 mx1.example.com",
         },
         {
             "name": "mx_not_ip_literal",
+            "title": "MX target is a hostname",
+            "description": (
+                "Confirms the highest-priority MX exchange is a hostname, not an "
+                "IPv4/IPv6 literal. RFC 5321 requires MX targets to be domain names."
+            ),
+            "reference": "RFC 5321 §5.1",
+            "severity": "critical",
             "passed": True,
-            "detail": "Top MX target mx1.example.com is a hostname",
+            "result": "Top MX target mx1.example.com is a hostname (not an IP literal)",
         },
         {
             "name": "mx_not_cname",
+            "title": "MX target is not a CNAME",
+            "description": (
+                "Confirms the highest-priority MX exchange is not a CNAME alias. "
+                "MX records must point to hostnames that resolve directly."
+            ),
+            "reference": "RFC 5321 §5.1",
+            "severity": "critical",
             "passed": True,
-            "detail": "Top MX target mx1.example.com is not a CNAME",
+            "result": "Top MX target mx1.example.com is not a CNAME",
         },
         {
             "name": "mx_resolves",
+            "title": "Top MX resolves",
+            "description": (
+                "Confirms the highest-priority MX hostname resolves to at least one "
+                "IP address (A or AAAA). If the MX host does not resolve, sending "
+                "MTAs cannot connect."
+            ),
+            "reference": "RFC 5321",
+            "severity": "critical",
             "passed": True,
-            "detail": "Top MX target mx1.example.com resolved to 203.0.113.10",
+            "result": "mx1.example.com resolved to 203.0.113.10",
         },
         {
             "name": "multiple_mx_records",
+            "title": "Multiple MX records",
+            "description": (
+                "Checks for more than one MX record so mail can fail over if a "
+                "primary host is unavailable."
+            ),
+            "reference": None,
+            "severity": "warning",
             "passed": True,
-            "detail": "Multiple MX records found for failover",
+            "result": "2 MX records: 10 mx1.example.com, 20 mx2.example.com",
         },
         {
             "name": "spf_record_present",
+            "title": "SPF record at apex",
+            "description": (
+                "Checks for a TXT record at the domain apex beginning with v=spf1. "
+                "SPF defines which hosts may send mail using this domain name."
+            ),
+            "reference": "RFC 7208",
+            "severity": "warning",
             "passed": True,
-            "detail": "SPF record found",
+            "result": "SPF present: v=spf1 include:_spf.example.com ~all",
         },
         {
             "name": "dmarc_record_present",
+            "title": "DMARC record published",
+            "description": (
+                "Checks for a TXT record at _dmarc.example.com beginning with "
+                "v=DMARC1. DMARC tells receivers how to handle mail that fails "
+                "SPF/DKIM alignment."
+            ),
+            "reference": "RFC 7489",
+            "severity": "warning",
             "passed": True,
-            "detail": "DMARC record found",
+            "result": "DMARC present: v=DMARC1; p=reject; rua=mailto:dmarc@example.com",
         },
         {
             "name": "domain_not_expiring_soon",
+            "title": "Domain registration not expiring soon",
+            "description": (
+                "Uses WHOIS to see whether the domain registration is expired or "
+                "expiring within 30 days. Omitted when WHOIS data is unavailable."
+            ),
+            "reference": None,
+            "severity": "warning",
             "passed": True,
-            "detail": "Domain expiry is more than 30 days away",
+            "result": "Registration valid; expires 2026-12-31 (224 days remaining)",
         },
     ],
 }
 
 router = APIRouter(tags=["Mail Health"])
-
-
-def _get_domain(email: str | None, domain: str | None) -> str:
-    """Resolve query inputs to a normalised domain or raise HTTP 422.
-
-    Args:
-        email: Email address whose domain should be extracted.
-        domain: Bare domain name to validate and normalise.
-
-    Returns:
-        Lowercased, normalised domain string.
-
-    Raises:
-        HTTPException: 422 if the inputs fail :func:`~mailpulse.core.domains.resolve_domain_input`.
-    """
-    try:
-        return resolve_domain_input(email=email, domain=domain)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.get(
@@ -93,17 +142,18 @@ def _get_domain(email: str | None, domain: str | None) -> str:
         "Inspect a domain's inbound mail readiness using DNS and WHOIS data. "
         "Provide exactly one query parameter: `email` to extract the domain from "
         "an address, or `domain` to check a bare domain directly.\n\n"
-        "MailPulse checks MX presence, null-MX declarations, MX target validity, "
-        "MX resolution, multiple-MX failover, SPF, DMARC, and domain expiry. "
-        "WHOIS-backed expiry checks may be omitted when registry data is "
-        "unavailable."
+        "Each check has a `severity` of `critical` or `warning`. The top-level "
+        "`status` is `healthy` only when every emitted critical check passes; "
+        "warning failures are reported in `checks` but do not affect `status`. "
+        "WHOIS-backed expiry checks may be omitted when registry data is unavailable."
     ),
     response_description="Mail-health verdict and ordered check results for the domain.",
     responses={
         200: {
             "description": (
-                "The domain was evaluated. The `status` field is `healthy` only "
-                "when every emitted check passed."
+                "The domain was evaluated. `status` is `healthy` when every emitted "
+                "critical check passed; `unhealthy` when any critical check failed. "
+                "Warning failures are included in `checks` but do not affect `status`."
             ),
             "content": {
                 "application/json": {
@@ -141,8 +191,8 @@ async def get_mail_health(
 ) -> MailHealthResponse:
     """Return mail-health checks for a domain.
 
-    Exactly one of ``email`` or ``domain`` must be supplied.  When
-    ``email`` is given the domain is extracted from the address.  When
+    Exactly one of ``email`` or ``domain`` must be supplied. When
+    ``email`` is given the domain is extracted from the address. When
     ``domain`` is given it is validated and used directly.
 
     Args:
@@ -157,5 +207,8 @@ async def get_mail_health(
         HTTPException: 422 if both or neither parameters are provided, or
             if the supplied value fails validation.
     """
-    resolved_domain = _get_domain(email=email, domain=domain)
+    try:
+        resolved_domain = resolve_domain_input(email=email, domain=domain)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return await run_in_threadpool(check_mail_health, resolved_domain)

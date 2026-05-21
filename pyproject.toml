@@ -1,7 +1,7 @@
 [project]
 name = "mailpulse"
-version = "0.1.0"
-description = "MailPulse — a modular FastAPI service"
+version = "1.0.0"
+description = "DNS and WHOIS checks for inbound mail domain health"
 requires-python = ">=3.12"
 dependencies = [
     "dnspython>=2.6",
